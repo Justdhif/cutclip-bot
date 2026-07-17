@@ -58,7 +58,8 @@ def get_main_keyboard():
     return InlineKeyboardMarkup([
         [
             InlineKeyboardButton("📖 Help", callback_data="menu:help"),
-            InlineKeyboardButton("🎬 Clip", callback_data="menu:clip")
+            InlineKeyboardButton("🎬 Clip", callback_data="menu:clip"),
+            InlineKeyboardButton("✍️ Caption", callback_data="menu:caption")
         ]
     ])
 
@@ -72,10 +73,64 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
 async def exit_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     context.user_data.clear()
     await update.message.reply_text(
-        "👋 **Mode kirim link telah dinonaktifkan.**\n\n" + WELCOME_TEXT,
+        "👋 **Mode aktif telah dinonaktifkan.**\n\n" + WELCOME_TEXT,
         parse_mode="Markdown",
         reply_markup=get_main_keyboard()
     )
+
+async def handle_video_for_caption(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    state = context.user_data.get("state")
+    if state != "WAITING_VIDEO_FOR_CAPTION":
+        await update.message.reply_text(
+            "⚠️ Silakan masuk ke menu **Caption** lalu klik **Generate** terlebih dahulu sebelum mengirimkan file video!\n\n"
+            "Ketik /start untuk membuka menu utama.",
+            parse_mode="Markdown"
+        )
+        return
+
+    video = update.message.video or update.message.document
+    if not video:
+        return
+
+    file_size_mb = video.file_size / (1024 * 1024)
+    if file_size_mb > 20:
+        await update.message.reply_text(
+            "⚠️ Ukuran file video terlalu besar. Telegram membatasi unggahan ke bot maksimal 20MB. "
+            "Silakan kompres video Anda atau kirimkan video yang lebih pendek."
+        )
+        return
+
+    status_message = await update.message.reply_text("📥 Mengunduh video Anda...")
+    
+    try:
+        context.user_data.clear()
+
+        file = await context.bot.get_file(video.file_id)
+        temp_dir = tempfile.gettempdir()
+        file_ext = ".mp4"
+        if hasattr(video, 'file_name') and video.file_name:
+            _, file_ext = os.path.splitext(video.file_name)
+            
+        local_path = os.path.join(temp_dir, f"caption_{video.file_unique_id}{file_ext}")
+        await file.download_to_drive(local_path)
+        
+        await status_message.edit_text("🎵 Mengekstrak & Mentranskripsi Audio (Groq Whisper)...")
+        processed_path = analyzer.convert_video_to_audio_if_large(local_path)
+        transcript_text = analyzer.transcribe_local_video(processed_path)
+        
+        safe_delete(local_path)
+        if processed_path != local_path:
+            safe_delete(processed_path)
+            
+        await status_message.edit_text("✍️ Menghasilkan Pilihan Caption Kreatif & Hashtags...")
+        caption_report = analyzer.generate_caption(transcript_text)
+        
+        await update.message.reply_text(caption_report, parse_mode="Markdown")
+        await status_message.delete()
+        
+    except Exception as e:
+        logger.error(f"Error handling video for caption: {e}", exc_info=True)
+        await status_message.edit_text(f"❌ Terjadi kesalahan saat memproses video: {str(e)}")
 
 # tren_mode and exit_mode functions removed
 
@@ -276,6 +331,31 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
         await query.message.edit_text(send_link_text, parse_mode="Markdown", reply_markup=InlineKeyboardMarkup(keyboard))
         return
         
+    if data == "menu:caption":
+        caption_text = (
+            "✍️ **Panduan Caption Generator**\n\n"
+            "Fitur ini membantu Anda membuat caption media sosial yang pas, menarik, gaul (ala humor Gen Z), serta menyertakan rekomendasi hashtag viral untuk menaikkan views video hasil editan Anda.\n\n"
+            "👉 **Cara Penggunaan**:\n"
+            "Cukup klik tombol **✨ Generate** di bawah, lalu unggah/kirim file video hasil editan Anda (format MP4/MOV, maksimal 20MB) ke bot ini. AI akan mendengarkan suara/percakapan di dalamnya untuk membuat caption yang sesuai!"
+        )
+        keyboard = [
+            [InlineKeyboardButton("✨ Generate", callback_data="menu:send_video")],
+            [InlineKeyboardButton("« Kembali", callback_data="menu:main")]
+        ]
+        await query.message.edit_text(caption_text, parse_mode="Markdown", reply_markup=InlineKeyboardMarkup(keyboard))
+        return
+        
+    if data == "menu:send_video":
+        context.user_data["state"] = "WAITING_VIDEO_FOR_CAPTION"
+        send_video_text = (
+            "📥 **Mode Caption Generator Aktif**\n\n"
+            "Silakan kirimkan/unggah file video hasil editan Anda (maksimal 20MB) ke chat ini sekarang.\n\n"
+            "*(Ketik /exit atau klik tombol Keluar di bawah untuk menonaktifkan mode ini)*"
+        )
+        keyboard = [[InlineKeyboardButton("❌ Keluar", callback_data="menu:main")]]
+        await query.message.edit_text(send_video_text, parse_mode="Markdown", reply_markup=InlineKeyboardMarkup(keyboard))
+        return
+        
     if data.startswith("cut:"):
         parts = data.split(":")
         if len(parts) == 4:
@@ -331,6 +411,7 @@ def run_bot() -> None:
     # Callback Query handler for video clipping buttons
     application.add_handler(CallbackQueryHandler(handle_callback))
 
+    application.add_handler(MessageHandler(filters.VIDEO | filters.Document.VIDEO, handle_video_for_caption))
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_text))
 
     logger.info("Bot started successfully in modular format. Polling for messages...")

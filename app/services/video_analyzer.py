@@ -284,3 +284,57 @@ class VideoAnalyzer:
             return target_mp4
             
         raise FileNotFoundError("Gagal memotong video YouTube")
+
+    def transcribe_local_video(self, local_path: str) -> str:
+        """
+        Transcribes a local video or audio file using Groq Whisper and returns the text.
+        """
+        try:
+            filename = os.path.basename(local_path)
+            with open(local_path, "rb") as f:
+                file_data = f.read()
+            response = self.client.audio.transcriptions.create(
+                file=(filename, file_data),
+                model="whisper-large-v3",
+                language="id"
+            )
+            return response.get("text", "")
+        except Exception as e:
+            logger.error(f"Gagal mentranskripsi video lokal: {e}")
+            return ""
+
+    def generate_caption(self, transcript_text: str) -> str:
+        """
+        Generates creative Gen Z style caption options and hashtags based on the transcript text.
+        """
+        if not transcript_text.strip():
+            transcript_text = "(Tidak ada percakapan suara terdeteksi dalam video, buatkan caption visual kreatif)"
+
+        prompt = (
+            f"Berdasarkan transkrip percakapan video berikut:\n"
+            f"\"\"\"\n{transcript_text}\n\"\"\"\n\n"
+            "Tugas Anda adalah membuat 3 pilihan caption media sosial (untuk TikTok, Reels, atau Shorts) yang sangat kreatif, menarik, gaul, dan relevan dengan gaya bahasa/humor Gen Z saat ini (menggunakan kata gaul seperti: menyala abangku, riil, no fek, salfok, gokil, dll). Sertakan juga kumpulan hashtag populer untuk menaikkan views.\n\n"
+            "Format output yang harus Anda hasilkan dalam Markdown Indonesia:\n\n"
+            "✍️ **PILIHAN CAPTION VIRAL**\n\n"
+            "📱 **Pilihan 1: Gen Z Style (Gaul & Relatable)**\n"
+            "[Isi caption ala Gen Z dengan emoji & kaomoji]\n\n"
+            "🧲 **Pilihan 2: High Hook (Mengundang Penonton/Clickbait)**\n"
+            "[Isi caption yang membuat orang penasaran untuk nonton sampai habis]\n\n"
+            "✨ **Pilihan 3: Singkat & Aesthetic**\n"
+            "[Isi caption singkat padat yang aesthetic]\n\n"
+            "🏷️ **Hashtags Terpopuler (Boost Views):**\n"
+            "[Daftar hashtag relevan ditambah hashtag fyp/viral, misal: #fyp #xyzbca #viral #trending]"
+        )
+        try:
+            completion = self.client.chat.completions.create(
+                model=self.manager.llm_model,
+                messages=[
+                    {"role": "system", "content": "Anda adalah pakar media sosial, copywriter viral, dan ahli bahasa gaul Gen Z. Selalu sisipkan juga beberapa Kaomoji Jepang (seperti (๑•̀ㅂ•́)و✧, (✿◠‿◠)) secara kreatif."},
+                    {"role": "user", "content": prompt}
+                ],
+                temperature=0.8,
+                max_tokens=1024,
+            )
+            return completion.choices[0].message.content
+        except Exception as e:
+            return f"Gagal membuat caption: {str(e)}"
