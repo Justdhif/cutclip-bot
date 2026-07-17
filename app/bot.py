@@ -47,7 +47,12 @@ async def post_init(application: Application) -> None:
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     context.user_data.clear()
-    welcome_text = "Hai saya CutClip Bot, ada yang bisa dibantu?"
+    welcome_text = (
+        "👋 **Halo! Saya CutClip Bot** 🎬🤖\n\n"
+        "Saya adalah asisten pintar berbasis AI yang siap mendampingi Anda memproduksi video pendek berkualitas tinggi!\n\n"
+        "Tugas utama saya adalah **mendeteksi momen-momen emas (paling menarik/lucu/klimaks)** dari video biasa maupun live streaming YouTube panjang, lalu memotongnya (*clipping*) menjadi cuplikan video pendek berdurasi kustom yang siap Anda unduh.\n\n"
+        "Silakan jelajahi tombol di bawah untuk melihat detail bantuan atau cara langsung memotong video! 👇"
+    )
     keyboard = [
         [
             InlineKeyboardButton("📖 Help", callback_data="help:general"),
@@ -55,7 +60,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         ]
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
-    await update.message.reply_text(welcome_text, reply_markup=reply_markup)
+    await update.message.reply_text(welcome_text, parse_mode="Markdown", reply_markup=reply_markup)
 
 async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     await start(update, context)
