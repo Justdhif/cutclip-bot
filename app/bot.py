@@ -17,7 +17,6 @@ from telegram.ext import (
 from app.config import Config
 from app.services.groq_client import GroqClientManager
 from app.services.video_analyzer import VideoAnalyzer
-from app.services.trend_advisor import TrendAdvisor
 from app.services.custom_clipper import CustomClipper
 from app.utils.file_helper import safe_delete
 
@@ -30,7 +29,6 @@ logger = logging.getLogger(__name__)
 # Initialize services
 manager = GroqClientManager()
 analyzer = VideoAnalyzer(manager)
-trend_advisor = TrendAdvisor(manager)
 custom_clipper = CustomClipper(manager)
 
 # Regex to detect YouTube URLs (including standard, shorts, and live streams)
@@ -43,8 +41,6 @@ async def post_init(application: Application) -> None:
     commands = [
         BotCommand("start", "Memulai bot & tampilkan menu utama"),
         BotCommand("analisis", "Panduan cara menganalisis video"),
-        BotCommand("tren", "Diskusi tren video & pembuatan script AI"),
-        BotCommand("exit", "Keluar dari mode diskusi tren"),
         BotCommand("help", "Penjelasan fitur & cara pakai"),
     ]
     await application.bot.set_my_commands(commands)
@@ -87,11 +83,8 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         "• *'tolong clip dari menit 1 sampai menit 2 dari link https://youtube...'* \n"
         "• *'clip detik 30 sampai 1:15 https://youtube...'*\n"
         "Bot akan langsung memotong video sesuai durasi kustom Anda dan mengirimkannya dengan audio!\n\n"
-        "💡 **3. Diskusi Tren & Pembuatan Script**\n"
-        "Gunakan perintah /tren untuk masuk ke mode diskusi. Anda bisa menanyakan ide konten, strategi hook, atau meminta AI membuatkan script.\n\n"
         "📖 **Perintah Lainnya:**\n"
         "• /analisis - Panduan analisis video\n"
-        "• /tren - Masuk ke mode diskusi tren\n"
         "• /help - Tampilkan pesan bantuan ini"
     )
     await reply_with_logo(update, welcome_text)
@@ -109,19 +102,7 @@ async def analisis_info(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
     )
     await reply_with_logo(update, info_text)
 
-async def tren_mode(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    context.user_data["state"] = "TRENDS_DISCUSSION"
-    context.user_data["history"] = []
-    tren_text = (
-        "💡 **Mode Diskusi Tren Aktif!**\n\n"
-        "Silakan tanyakan apa saja tentang tren konten video pendek, konsultasi ide, atau minta saya membuatkan script video.\n"
-        "Ketik /exit atau /start untuk keluar dari mode diskusi."
-    )
-    await reply_with_logo(update, tren_text)
-
-async def exit_mode(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    context.user_data.clear()
-    await update.message.reply_text("Keluar dari mode diskusi. Mode normal aktif kembali.")
+# tren_mode and exit_mode functions removed
 
 async def handle_video(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     video = update.message.video or update.message.document
@@ -320,23 +301,10 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
             await status_message.edit_text(f"❌ Terjadi kesalahan saat memproses link YouTube: {str(e)}")
         return
 
-    state = context.user_data.get("state")
-    if state == "TRENDS_DISCUSSION":
-        history = context.user_data.get("history", [])
-        await context.bot.send_chat_action(chat_id=update.effective_chat.id, action="typing")
-        response = trend_advisor.chat_about_trends(text, history)
-        
-        history.append(("user", text))
-        history.append(("assistant", response))
-        context.user_data["history"] = history[-10:]
-        
-        await reply_with_logo(update, response)
-    else:
-        await reply_with_logo(
-            update,
-            "💡 Kirim link video YouTube atau upload file video secara langsung untuk memulai analisis.\n\n"
-            "Atau ketik /tren untuk masuk ke mode konsultasi ide dan penulisan script video."
-        )
+    await reply_with_logo(
+        update,
+        "💡 Kirim link video YouTube atau upload file video secara langsung untuk memulai analisis."
+    )
 
 async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Handles inline keyboard button clicks for video clipping."""
@@ -395,8 +363,6 @@ def run_bot() -> None:
     application.add_handler(CommandHandler("start", start))
     application.add_handler(CommandHandler("help", help_command))
     application.add_handler(CommandHandler("analisis", analisis_info))
-    application.add_handler(CommandHandler("tren", tren_mode))
-    application.add_handler(CommandHandler("exit", exit_mode))
 
     # Callback Query handler for video clipping buttons
     application.add_handler(CallbackQueryHandler(handle_callback))
