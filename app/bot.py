@@ -82,12 +82,13 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         "Kirim link YouTube dan ketik instruksi pemotongan Anda, contoh:\n"
         "• *'tolong clip dari menit 1 sampai menit 2 dari link https://youtube...'* \n"
         "• *'clip detik 30 sampai 1:15 https://youtube...'*\n"
-        "Bot akan langsung memotong video sesuai durasi kustom Anda dan mengirimkannya dengan audio!\n\n"
-        "📖 **Perintah Lainnya:**\n"
-        "• /analisis - Panduan analisis video\n"
-        "• /help - Tampilkan pesan bantuan ini"
+        "Bot akan langsung memotong video sesuai durasi kustom Anda dan mengirimkannya dengan audio!"
     )
-    await reply_with_logo(update, welcome_text)
+    keyboard = [
+        [InlineKeyboardButton("🎥 Panduan Analisis Video", callback_data="help:analisis")]
+    ]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    await reply_with_logo(update, welcome_text, reply_markup=reply_markup)
 
 async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     await start(update, context)
@@ -312,6 +313,17 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
     await query.answer() # Ack the query
     
     data = query.data
+    if data == "help:analisis":
+        info_text = (
+            "🎥 **Cara Menganalisis Video:**\n\n"
+            "1. **Upload Video Langsung**:\n"
+            "   Kirim file video (.mp4, .mov, dll.) langsung ke chat ini. Pastikan ukuran file di bawah 20MB.\n\n"
+            "2. **Kirim Link YouTube**:\n"
+            "   Cukup paste/kirim link YouTube, YouTube Shorts, atau link Youtube stream ke chat ini. AI akan mengambil audio dari link tersebut untuk dianalisis secara berkala (per 20 menit)."
+        )
+        await query.message.reply_text(info_text, parse_mode="Markdown")
+        return
+        
     if data.startswith("cut:"):
         parts = data.split(":")
         if len(parts) == 4:
