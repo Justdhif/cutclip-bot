@@ -330,7 +330,15 @@ def run_bot() -> None:
     """Initializes and runs the Telegram bot polling loop."""
     Config.validate()
     
-    application = Application.builder().token(Config.TELEGRAM_BOT_TOKEN).post_init(post_init).build()
+    application = (
+        Application.builder()
+        .token(Config.TELEGRAM_BOT_TOKEN)
+        .post_init(post_init)
+        .connect_timeout(60.0)
+        .read_timeout(60.0)
+        .write_timeout(60.0)
+        .build()
+    )
 
     application.add_handler(CommandHandler("start", start))
     application.add_handler(CommandHandler("help", help_command))
