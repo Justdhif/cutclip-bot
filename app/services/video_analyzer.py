@@ -240,11 +240,12 @@ class VideoAnalyzer:
         Returns the local file path of the trimmed video.
         """
         url = f"https://www.youtube.com/watch?v={video_id}"
-        output_filename = os.path.join(self.download_dir, f"{video_id}_{start_time}_{end_time}.mp4")
+        base_path = os.path.join(self.download_dir, f"{video_id}_{start_time}_{end_time}")
+        output_template = f"{base_path}.%(ext)s"
         
         ydl_opts = {
             'format': 'bestvideo[height<=1080]+bestaudio/best',
-            'outtmpl': output_filename,
+            'outtmpl': output_template,
             'download_ranges': lambda info_dict, ydl: [{'start_time': start_time, 'end_time': end_time}],
             'force_keyframes_at_cuts': True,
             'external_downloader_args': {
@@ -257,12 +258,13 @@ class VideoAnalyzer:
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             ydl.download([url])
             
-        base = os.path.splitext(output_filename)[0]
-        for ext in ['mp4', 'mkv', 'webm', '3gp']:
-            candidate = f"{base}.{ext}"
+        # Scan for the actual file created with double extension (e.g. .mp4.webm) or normal extension
+        for ext in ['mp4', 'mkv', 'webm', '3gp', 'mp4.webm', 'mp4.mkv']:
+            candidate = f"{base_path}.{ext}"
             if os.path.exists(candidate):
+                # If the extension is not .mp4, we convert it to mp4 for max device compatibility
                 if ext != 'mp4':
-                    mp4_path = f"{base}.mp4"
+                    mp4_path = f"{base_path}.mp4"
                     try:
                         cmd = [
                             "ffmpeg", "-y", "-i", candidate, 
@@ -276,7 +278,9 @@ class VideoAnalyzer:
                         logger.warning(f"Gagal mengonversi format {ext} ke mp4: {e}. Mengirimkan file asli.")
                 return candidate
                 
-        if os.path.exists(output_filename):
-            return output_filename
+        # Fallback check
+        target_mp4 = f"{base_path}.mp4"
+        if os.path.exists(target_mp4):
+            return target_mp4
             
         raise FileNotFoundError("Gagal memotong video YouTube")
