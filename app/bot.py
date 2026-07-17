@@ -50,6 +50,30 @@ async def post_init(application: Application) -> None:
     await application.bot.set_my_commands(commands)
     logger.info("Saran perintah bot (Bot Commands) berhasil didaftarkan ke Telegram.")
 
+async def reply_with_logo(update: Update, text: str, reply_markup=None) -> None:
+    logo_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "logo.jpg")
+    if os.path.exists(logo_path):
+        try:
+            if len(text) <= 1024:
+                await update.message.reply_photo(
+                    photo=open(logo_path, "rb"),
+                    caption=text,
+                    parse_mode="Markdown",
+                    reply_markup=reply_markup
+                )
+            else:
+                await update.message.reply_photo(photo=open(logo_path, "rb"))
+                await update.message.reply_text(
+                    text,
+                    parse_mode="Markdown",
+                    reply_markup=reply_markup
+                )
+            return
+        except Exception as e:
+            logger.warning(f"Gagal mengirim logo: {e}")
+            
+    await update.message.reply_text(text, parse_mode="Markdown", reply_markup=reply_markup)
+
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     context.user_data.clear()
     welcome_text = (
@@ -70,7 +94,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         "• /tren - Masuk ke mode diskusi tren\n"
         "• /help - Tampilkan pesan bantuan ini"
     )
-    await update.message.reply_text(welcome_text, parse_mode="Markdown")
+    await reply_with_logo(update, welcome_text)
 
 async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     await start(update, context)
@@ -83,7 +107,7 @@ async def analisis_info(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
         "2. **Kirim Link YouTube**:\n"
         "   Cukup paste/kirim link YouTube, YouTube Shorts, atau link Youtube stream ke chat ini. AI akan mengambil audio dari link tersebut untuk dianalisis secara berkala (per 20 menit)."
     )
-    await update.message.reply_text(info_text, parse_mode="Markdown")
+    await reply_with_logo(update, info_text)
 
 async def tren_mode(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     context.user_data["state"] = "TRENDS_DISCUSSION"
@@ -93,7 +117,7 @@ async def tren_mode(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         "Silakan tanyakan apa saja tentang tren konten video pendek, konsultasi ide, atau minta saya membuatkan script video.\n"
         "Ketik /exit atau /start untuk keluar dari mode diskusi."
     )
-    await update.message.reply_text(tren_text, parse_mode="Markdown")
+    await reply_with_logo(update, tren_text)
 
 async def exit_mode(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     context.user_data.clear()
@@ -163,7 +187,7 @@ async def handle_video(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
                 break
                 
             clean_report = re.sub(r'=== CLIPS DATA ===.*=== END CLIPS DATA ===', '', analysis_report, flags=re.DOTALL).strip()
-            await update.message.reply_text(clean_report, parse_mode="Markdown")
+            await reply_with_logo(update, clean_report)
             
         await status_message.delete()
 
@@ -287,7 +311,7 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
                     keyboard.append([InlineKeyboardButton(button_text, callback_data=callback_data)])
                     
                 reply_markup = InlineKeyboardMarkup(keyboard) if keyboard else None
-                await update.message.reply_text(clean_report, parse_mode="Markdown", reply_markup=reply_markup)
+                await reply_with_logo(update, clean_report, reply_markup=reply_markup)
                 
             await status_message.delete()
             
@@ -306,9 +330,10 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
         history.append(("assistant", response))
         context.user_data["history"] = history[-10:]
         
-        await update.message.reply_text(response, parse_mode="Markdown")
+        await reply_with_logo(update, response)
     else:
-        await update.message.reply_text(
+        await reply_with_logo(
+            update,
             "💡 Kirim link video YouTube atau upload file video secara langsung untuk memulai analisis.\n\n"
             "Atau ketik /tren untuk masuk ke mode konsultasi ide dan penulisan script video."
         )
