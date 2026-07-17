@@ -288,7 +288,7 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
                     
                     # Format callback: cut:<youtube_id>:<start_sec>:<end_sec>
                     callback_data = f"cut:{video_id}:{start_sec}:{end_sec}"
-                    button_text = f"🎬 Gunting: {title} ({start_sec}s - {end_sec}s)"
+                    button_text = f"🎬 {title}"
                     keyboard.append([InlineKeyboardButton(button_text, callback_data=callback_data)])
                     
                 reply_markup = InlineKeyboardMarkup(keyboard) if keyboard else None
