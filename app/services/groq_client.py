@@ -1,5 +1,6 @@
 import requests
 import json
+import time
 from app.config import Config
 
 class GroqAudioTranscriptions:
@@ -20,9 +21,17 @@ class GroqAudioTranscriptions:
             "response_format": response_format,
             "language": language
         }
-        response = requests.post(url, headers=headers, files=files, data=data)
+        
+        for attempt in range(3):
+            response = requests.post(url, headers=headers, files=files, data=data)
+            if response.status_code == 429:
+                # Rate limit hit, wait 20s and retry
+                time.sleep(20)
+                continue
+            response.raise_for_status()
+            return response.json()
+        
         response.raise_for_status()
-        return response.json()
 
 class GroqChatCompletionsChoiceMessage:
     def __init__(self, content):
@@ -52,11 +61,19 @@ class GroqChatCompletions:
             "temperature": temperature,
             "max_tokens": max_tokens
         }
-        response = requests.post(url, headers=headers, json=payload)
+        
+        for attempt in range(3):
+            response = requests.post(url, headers=headers, json=payload)
+            if response.status_code == 429:
+                # Rate limit hit, wait 20s and retry
+                time.sleep(20)
+                continue
+            response.raise_for_status()
+            data = response.json()
+            message_content = data["choices"][0]["message"]["content"]
+            return GroqChatCompletionsResponse(message_content)
+            
         response.raise_for_status()
-        data = response.json()
-        message_content = data["choices"][0]["message"]["content"]
-        return GroqChatCompletionsResponse(message_content)
 
 class GroqAudio:
     def __init__(self, api_key):
