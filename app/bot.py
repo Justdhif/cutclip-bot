@@ -40,6 +40,7 @@ async def post_init(application: Application) -> None:
     """Registers bot commands to show as suggestions in the Telegram chat."""
     commands = [
         BotCommand("start", "Memulai CutClip Bot"),
+        BotCommand("exit", "Keluar dari mode kirim link"),
         BotCommand("help", "Bantuan & Panduan"),
     ]
     await application.bot.set_my_commands(commands)
@@ -67,6 +68,14 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 
 async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     await start(update, context)
+
+async def exit_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    context.user_data.clear()
+    await update.message.reply_text(
+        "👋 **Mode kirim link telah dinonaktifkan.**\n\n" + WELCOME_TEXT,
+        parse_mode="Markdown",
+        reply_markup=get_main_keyboard()
+    )
 
 # tren_mode and exit_mode functions removed
 
@@ -240,13 +249,13 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
         
     if data == "menu:clip":
         clip_text = (
-            "🎬 **Panduan Memotong (Clip) Video & Deteksi Momen:**\n\n"
-            "1. **Mendeteksi Momen Menarik (AI)**:\n"
-            "   Cukup kirimkan link video YouTube atau link Live Stream. AI akan mentranskripsi suara dan memberikan rekomendasi momen terbaik beserta tombol potong otomatis.\n\n"
-            "2. **Memotong Klip Kustom secara Manual**:\n"
-            "   Kirim link YouTube Anda diikuti dengan durasi menit/detik yang ingin dipotong. Contoh:\n"
-            "   • *'tolong clip dari menit 1 sampai menit 2 dari link https://youtube...'* \n"
-            "   • *'clip detik 30 sampai 1:15 https://youtube...'* "
+            "🎬 **Panduan Memotong (Clip) Video & Deteksi Momen**\n\n"
+            "1️⃣ **Deteksi Momen Otomatis (AI)**\n"
+            "Kirimkan link video YouTube atau Live Stream. AI akan menganalisis percakapan/suara dan menyajikan rekomendasi klip terbaik secara otomatis.\n\n"
+            "2️⃣ **Potong Klip Kustom (Manual)**\n"
+            "Kirim link YouTube disertai durasi yang ingin Anda potong. Contoh format:\n"
+            "• `clip menit 1 sampai 2 https://youtube...`\n"
+            "• `clip detik 30 sampai 1:15 https://youtube...`"
         )
         keyboard = [
             [InlineKeyboardButton("🔗 Kirim Link YT", callback_data="menu:send_link")],
@@ -260,9 +269,9 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
         send_link_text = (
             "📥 **Mode Kirim Link YT Aktif**\n\n"
             "Silakan paste/kirimkan link video YouTube, Shorts, atau Live Stream ke chat ini sekarang.\n\n"
-            "*(Klik Batal di bawah untuk keluar dari mode ini)*"
+            "*(Ketik /exit atau klik tombol Keluar di bawah untuk menonaktifkan mode ini)*"
         )
-        keyboard = [[InlineKeyboardButton("❌ Batal", callback_data="menu:main")]]
+        keyboard = [[InlineKeyboardButton("❌ Keluar", callback_data="menu:main")]]
         await query.message.edit_text(send_link_text, parse_mode="Markdown", reply_markup=InlineKeyboardMarkup(keyboard))
         return
         
@@ -316,6 +325,7 @@ def run_bot() -> None:
 
     application.add_handler(CommandHandler("start", start))
     application.add_handler(CommandHandler("help", help_command))
+    application.add_handler(CommandHandler("exit", exit_command))
 
     # Callback Query handler for video clipping buttons
     application.add_handler(CallbackQueryHandler(handle_callback))
