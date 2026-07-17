@@ -100,7 +100,7 @@ async def analisis_info(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
         "2. **Kirim Link YouTube**:\n"
         "   Cukup paste/kirim link YouTube, YouTube Shorts, atau link Youtube stream ke chat ini. AI akan mengambil audio dari link tersebut untuk dianalisis secara berkala (per 20 menit)."
     )
-    await reply_with_logo(update, info_text)
+    await update.message.reply_text(info_text, parse_mode="Markdown")
 
 # tren_mode and exit_mode functions removed
 
@@ -301,9 +301,9 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
             await status_message.edit_text(f"❌ Terjadi kesalahan saat memproses link YouTube: {str(e)}")
         return
 
-    await reply_with_logo(
-        update,
-        "💡 Kirim link video YouTube atau upload file video secara langsung untuk memulai analisis."
+    await update.message.reply_text(
+        "💡 Kirim link video YouTube atau upload file video secara langsung untuk memulai analisis.",
+        parse_mode="Markdown"
     )
 
 async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
