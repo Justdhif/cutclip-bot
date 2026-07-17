@@ -251,8 +251,6 @@ class VideoAnalyzer:
                 'ffmpeg_i': ['-headers', 'User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36\r\n']
             },
             'js_runtimes': {'node': {}},
-            'quiet': True,
-            'no_warnings': True,
         }
         
         logger.info(f"Memulai cuplikan download untuk {video_id} dari detik {start_time} ke {end_time}")
