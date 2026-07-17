@@ -244,7 +244,7 @@ class VideoAnalyzer:
         output_template = f"{base_path}.%(ext)s"
         
         ydl_opts = {
-            'format': 'bestvideo[height<=1080]+bestaudio/best',
+            'format': 'best',
             'outtmpl': output_template,
             'download_ranges': lambda info_dict, ydl: [{'start_time': start_time, 'end_time': end_time}],
             'force_keyframes_at_cuts': True,
