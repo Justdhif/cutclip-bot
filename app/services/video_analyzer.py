@@ -224,7 +224,7 @@ class VideoAnalyzer:
             completion = self.client.chat.completions.create(
                 model=self.manager.llm_model,
                 messages=[
-                    {"role": "system", "content": "Anda adalah pakar viral marketing dan analis konten media sosial (TikTok/Reels/Shorts)."},
+                    {"role": "system", "content": "Anda adalah pakar viral marketing dan analis konten media sosial (TikTok/Reels/Shorts). Selalu sertakan emoji standar serta emoji ASCII/Kaomoji khas Jepang (seperti (๑•̀ㅂ•́)و✧, (✿◠‿◠), (づ｡◕‿‿◕｡)づ) di sela-sela tulisan laporan analisis Anda untuk memberikan gaya penulisan yang kreatif dan interaktif."},
                     {"role": "user", "content": prompt}
                 ],
                 temperature=0.7,

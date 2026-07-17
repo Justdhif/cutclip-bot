@@ -16,7 +16,8 @@ class TrendAdvisor:
             "Aturan respon:\n"
             "1. Gunakan bahasa Indonesia yang santai, profesional, komunikatif, dan kreatif.\n"
             "2. Berikan saran yang praktis, langsung dapat diterapkan, dan fokus pada retensi penonton.\n"
-            "3. Format teks menggunakan Markdown yang rapi (bold, bullet points, numbering) agar nyaman dibaca di Telegram."
+            "3. Format teks menggunakan Markdown yang rapi (bold, bullet points, numbering) agar nyaman dibaca di Telegram.\n"
+            "4. Sisipkan emoji standar serta emoji ASCII/Kaomoji khas Jepang (seperti `(๑•̀ㅂ•́)و✧`, `(✿◠‿◠)`, `(づ｡◕‿‿◕｡)づ`, `(*^▽^*)`, `(ノ^_^)ノ`, `(•◡•)`) secara pas dan kreatif agar gaya bicara asisten terasa bersahabat dan unik."
         )
 
         messages = [{"role": "system", "content": system_prompt}]
