@@ -1,7 +1,6 @@
 import os
 import sys
 import logging
-import static_ffmpeg
 import http.server
 import socketserver
 import threading
@@ -11,9 +10,10 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 # Set up static ffmpeg path automatically
 try:
+    import static_ffmpeg
     static_ffmpeg.add_paths()
-except Exception as e:
-    logging.warning(f"Gagal memuat static-ffmpeg: {e}")
+except (ImportError, AttributeError, Exception) as e:
+    logging.warning(f"Gagal memuat static-ffmpeg (mencoba menggunakan ffmpeg sistem): {e}")
 
 from app.bot import run_bot
 
