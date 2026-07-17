@@ -35,6 +35,24 @@ custom_clipper = CustomClipper(manager)
 YOUTUBE_REGEX = re.compile(
     r'(https?://)?(www\.)?(youtube|youtu|youtube-nocookie)\.(com|be)/(watch\?v=|embed/|v/|shorts/|live/)?([a-zA-Z0-9_-]{11})'
 )
+TIKTOK_REGEX = re.compile(r'(https?://)?(www\.|vm\.|vt\.)?tiktok\.com/[^\s]+')
+INSTAGRAM_REGEX = re.compile(r'(https?://)?(www\.)?instagram\.com/[^\s]+')
+
+def extract_link(text: str):
+    """Detects and returns any supported video link (YouTube, TikTok, or Instagram)."""
+    yt = YOUTUBE_REGEX.search(text)
+    if yt:
+        return yt.group(0), "youtube", yt.group(6)
+    
+    tt = TIKTOK_REGEX.search(text)
+    if tt:
+        return tt.group(0), "tiktok", None
+        
+    ig = INSTAGRAM_REGEX.search(text)
+    if ig:
+        return ig.group(0), "instagram", None
+        
+    return None, None, None
 
 async def post_init(application: Application) -> None:
     """Registers bot commands to show as suggestions in the Telegram chat."""
@@ -142,140 +160,177 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
         return
 
     state = context.user_data.get("state")
-    if state != "WAITING_YOUTUBE_LINK":
-        await update.message.reply_text(
-            "⚠️ Silakan masuk ke menu **Clip** lalu klik **Kirim Link YT** terlebih dahulu sebelum mengirim link atau teks!\n\n"
-            "Ketik /start untuk membuka menu utama.",
-            parse_mode="Markdown"
-        )
-        return
-
-    youtube_match = YOUTUBE_REGEX.search(text)
-    if youtube_match:
-        # Clear state after receiving valid link to exit the mode
-        context.user_data.clear()
-        
-        url = youtube_match.group(0)
-        video_id = youtube_match.group(6) # The 11 character video ID
-        
-        # Check if the user is requesting a custom clip (e.g. contains clip, potong, cut, or timestamp indicators)
-        is_custom_clip = any(keyword in text.lower() for keyword in ["clip", "potong", "gunting", "cut", "trim", "ambil"])
-        
-        if is_custom_clip:
-            status_message = await update.message.reply_text("🔍 Menganalisis instruksi pemotongan kustom Anda...")
-            time_data = custom_clipper.parse_time_range(text)
-            
-            if "error" not in time_data:
-                start_sec = time_data["start"]
-                end_sec = time_data["end"]
-                duration = end_sec - start_sec
+    
+    # 1. Handling for Caption Generator mode (Link input fallback)
+    if state == "WAITING_VIDEO_FOR_CAPTION":
+        url, platform, _ = extract_link(text)
+        if url:
+            context.user_data.clear() # Clear state
+            status_message = await update.message.reply_text("📥 Mengunduh audio dari link untuk dibuatkan caption...")
+            try:
+                audio_path = analyzer.extract_youtube_audio(url)
+                await status_message.edit_text("🎵 Mengekstrak & Mentranskripsi Audio (Groq Whisper)...")
+                processed_path = analyzer.convert_video_to_audio_if_large(audio_path)
+                transcript_text = analyzer.transcribe_local_video(processed_path)
                 
-                if start_sec >= 0 and end_sec > start_sec and duration <= 600: # Limit custom clips to 10 mins
-                    await status_message.edit_text(
-                        f"✂️ Sedang mengambil & memotong video kustom (Detik {start_sec} - {end_sec}, Durasi: {duration}s). Mohon tunggu..."
-                    )
-                    try:
-                        clip_path = analyzer.trim_youtube_video(video_id, start_sec, end_sec)
-                        await status_message.edit_text("📤 Mengunggah klip video kustom Anda...")
-                        
-                        with open(clip_path, "rb") as video_file:
-                            await update.message.reply_video(
-                                video=video_file,
-                                caption=f"🎥 **Potongan Klip Kustom (Detik {start_sec} - {end_sec})**\nSelesai dipotong sesuai permintaan Anda dengan audio!",
-                                parse_mode="Markdown"
-                            )
-                        
-                        safe_delete(clip_path)
-                        await status_message.delete()
-                        return # Exit early, do not do the full analysis
-                    except Exception as e:
-                        logger.error(f"Gagal memotong klip kustom: {e}", exc_info=True)
-                        await status_message.edit_text(f"❌ Terjadi kesalahan saat memotong klip video: {str(e)}")
+                safe_delete(audio_path)
+                if processed_path != audio_path:
+                    safe_delete(processed_path)
+                    
+                await status_message.edit_text("✍️ Menghasilkan Pilihan Caption Kreatif & Hashtags...")
+                caption_report = analyzer.generate_caption(transcript_text)
+                
+                await update.message.reply_text(caption_report, parse_mode="Markdown")
+                await status_message.delete()
+            except Exception as e:
+                logger.error(f"Error generating caption from link: {e}", exc_info=True)
+                await status_message.edit_text(f"❌ Gagal memproses link tersebut: {str(e)}")
+            return
+        else:
+            await update.message.reply_text(
+                "⚠️ Format tidak dikenali. Silakan unggah file video hasil editan Anda, "
+                "atau paste link video (YouTube/TikTok/Instagram) ke chat ini.\n\n"
+                "Ketik /exit untuk membatalkan.",
+                parse_mode="Markdown"
+            )
+            return
+
+    # 2. Handling for Moment Clipping mode
+    if state == "WAITING_YOUTUBE_LINK":
+        url, platform, video_id = extract_link(text)
+        if url:
+            context.user_data.clear() # Clear state
+            
+            # Check if platform is not YouTube and user tried custom clip
+            is_custom_clip = any(keyword in text.lower() for keyword in ["clip", "potong", "gunting", "cut", "trim", "ambil"])
+            if is_custom_clip and platform != "youtube":
+                await update.message.reply_text(
+                    "⚠️ Fitur potong klip manual (custom clipping) saat ini hanya didukung untuk link YouTube.\n\n"
+                    "Untuk link TikTok/Instagram, kami akan langsung menganalisis seluruh isi video tersebut secara otomatis.",
+                    parse_mode="Markdown"
+                )
+                is_custom_clip = False
+
+            if is_custom_clip and platform == "youtube" and video_id:
+                status_message = await update.message.reply_text("🔍 Menganalisis instruksi pemotongan kustom Anda...")
+                time_data = custom_clipper.parse_time_range(text)
+                
+                if "error" not in time_data:
+                    start_sec = time_data["start"]
+                    end_sec = time_data["end"]
+                    duration = end_sec - start_sec
+                    
+                    if start_sec >= 0 and end_sec > start_sec and duration <= 600: # Limit custom clips to 10 mins
+                        await status_message.edit_text(
+                            f"✂️ Sedang mengambil & memotong video kustom (Detik {start_sec} - {end_sec}, Durasi: {duration}s). Mohon tunggu..."
+                        )
+                        try:
+                            clip_path = analyzer.trim_youtube_video(video_id, start_sec, end_sec)
+                            await status_message.edit_text("📤 Mengunggah klip video kustom Anda...")
+                            
+                            with open(clip_path, "rb") as video_file:
+                                await update.message.reply_video(
+                                    video=video_file,
+                                    caption=f"🎥 **Potongan Klip Kustom (Detik {start_sec} - {end_sec})**\nSelesai dipotong sesuai permintaan Anda dengan audio!",
+                                    parse_mode="Markdown"
+                                )
+                            
+                            safe_delete(clip_path)
+                            await status_message.delete()
+                            return # Exit early
+                        except Exception as e:
+                            logger.error(f"Gagal memotong klip kustom: {e}", exc_info=True)
+                            await status_message.edit_text(f"❌ Terjadi kesalahan saat memotong klip video: {str(e)}")
+                            return
+                    else:
+                        await status_message.edit_text("⚠️ Waktu mulai harus lebih kecil dari selesai, dan durasi maksimal klip kustom adalah 10 menit.")
                         return
                 else:
-                    await status_message.edit_text("⚠️ Waktu mulai harus lebih kecil dari selesai, dan durasi maksimal klip kustom adalah 10 menit.")
+                    await status_message.delete()
+            
+            # Run full analysis
+            status_message = await update.message.reply_text(f"📥 Mengunduh stream audio dari {platform.capitalize()}...")
+            try:
+                audio_path = analyzer.extract_youtube_audio(url)
+                
+                await status_message.edit_text(f"🎵 Memproses & Mentranskripsi audio {platform.capitalize()} (Groq Whisper)...")
+                processed_path = analyzer.convert_video_to_audio_if_large(audio_path)
+                verbose_data = analyzer.transcribe_audio_verbose(processed_path)
+                sessions = analyzer.split_transcript_into_sessions(verbose_data)
+                
+                safe_delete(audio_path)
+                if processed_path != audio_path:
+                    safe_delete(processed_path)
+                
+                if not sessions:
+                    await status_message.edit_text("❌ Gagal mendeteksi percakapan/suara dari link tersebut.")
                     return
-            else:
-                # If extraction fails to find a range, clean up and fallback to normal session analysis
+
+                await status_message.edit_text(f"🧠 Menganalisis potensi viralitas & merekomendasikan klip ({len(sessions)} sesi)...")
+                
+                title = f"{platform.capitalize()} Video ({video_id or 'Video'})"
+                for idx, session in enumerate(sessions):
+                    label = session["session_label"]
+                    text_transcript = session["transcript_text"]
+                    
+                    analysis_report = ""
+                    for attempt in range(4):
+                        analysis_report = analyzer.analyze_viral_potential(text_transcript, title, label)
+                        if "429" in analysis_report or "Too Many Requests" in analysis_report:
+                            if attempt < 3:
+                                wait_sec = 25
+                                await status_message.edit_text(
+                                    f"⏳ Terkena limit API Groq untuk {label}.\n"
+                                    f"Menunggu {wait_sec} detik sebelum mencoba kembali (Percobaan {attempt + 1}/3)..."
+                                )
+                                await asyncio.sleep(wait_sec)
+                                await status_message.edit_text(f"🧠 Menganalisis potensi viralitas & merekomendasikan klip ({label})...")
+                                continue
+                        break
+                    
+                    # Extract JSON data for buttons (only for YouTube)
+                    clips_data = []
+                    if platform == "youtube" and video_id:
+                        json_match = re.search(r'=== CLIPS DATA ===\n(.*?)\n=== END CLIPS DATA ===', analysis_report, re.DOTALL)
+                        if json_match:
+                            try:
+                                clips_data = json.loads(json_match.group(1).strip())
+                            except Exception as e:
+                                logger.error(f"Gagal memparsing clips JSON data: {e}")
+                    
+                    clean_report = re.sub(r'=== CLIPS DATA ===.*=== END CLIPS DATA ===', '', analysis_report, flags=re.DOTALL).strip()
+                    
+                    # Build inline buttons for each clip recommendation in this session (only for YouTube)
+                    keyboard = []
+                    if platform == "youtube" and video_id:
+                        for clip in clips_data:
+                            clip_id = clip.get("id", 1)
+                            start_sec = clip.get("start", 0)
+                            end_sec = clip.get("end", 0)
+                            title_clip = clip.get("title", f"Klip {clip_id}")
+                            callback_data = f"cut:{video_id}:{start_sec}:{end_sec}"
+                            button_text = f"🎬 {title_clip}"
+                            keyboard.append([InlineKeyboardButton(button_text, callback_data=callback_data)])
+                        
+                    reply_markup = InlineKeyboardMarkup(keyboard) if keyboard else None
+                    await update.message.reply_text(clean_report, parse_mode="Markdown", reply_markup=reply_markup)
+                    
                 await status_message.delete()
-        
-        status_message = await update.message.reply_text("📥 Mengunduh stream audio dari YouTube...")
-        try:
-            audio_path = analyzer.extract_youtube_audio(url)
-            
-            await status_message.edit_text("🎵 Memproses & Mentranskripsi audio YouTube (Groq Whisper)...")
-            processed_path = analyzer.convert_video_to_audio_if_large(audio_path)
-            
-            # Transcribe with timestamps
-            verbose_data = analyzer.transcribe_audio_verbose(processed_path)
-            sessions = analyzer.split_transcript_into_sessions(verbose_data)
-            
-            safe_delete(audio_path)
-            if processed_path != audio_path:
-                safe_delete(processed_path)
-            
-            if not sessions:
-                await status_message.edit_text("❌ Gagal mendeteksi percakapan/suara dari link tersebut.")
-                return
+                
+            except Exception as e:
+                logger.error(f"Error handling link: {e}", exc_info=True)
+                await status_message.edit_text(f"❌ Terjadi kesalahan saat memproses link: {str(e)}")
+            return
+        else:
+            await update.message.reply_text(
+                "❌ Link tidak valid atau platform tidak didukung. Silakan kirim link YouTube, TikTok, atau Instagram yang valid.",
+                parse_mode="Markdown"
+            )
+            return
 
-            await status_message.edit_text(f"🧠 Menganalisis potensi viralitas & merekomendasikan klip ({len(sessions)} sesi)...")
-            
-            # Send separate bubble chats for each 20-minute session
-            for idx, session in enumerate(sessions):
-                label = session["session_label"]
-                text_transcript = session["transcript_text"]
-                
-                analysis_report = ""
-                for attempt in range(4):
-                    analysis_report = analyzer.analyze_viral_potential(text_transcript, f"YouTube Video ({url})", label)
-                    if "429" in analysis_report or "Too Many Requests" in analysis_report:
-                        if attempt < 3:
-                            wait_sec = 25
-                            await status_message.edit_text(
-                                f"⏳ Terkena limit API Groq untuk {label}.\n"
-                                f"Menunggu {wait_sec} detik sebelum mencoba kembali (Percobaan {attempt + 1}/3)..."
-                            )
-                            await asyncio.sleep(wait_sec)
-                            await status_message.edit_text(f"🧠 Menganalisis potensi viralitas & merekomendasikan klip ({label})...")
-                            continue
-                    break
-                
-                # Extract JSON data for buttons
-                clips_data = []
-                json_match = re.search(r'=== CLIPS DATA ===\n(.*?)\n=== END CLIPS DATA ===', analysis_report, re.DOTALL)
-                if json_match:
-                    try:
-                        clips_data = json.loads(json_match.group(1).strip())
-                    except Exception as e:
-                        logger.error(f"Gagal memparsing clips JSON data: {e}")
-                
-                clean_report = re.sub(r'=== CLIPS DATA ===.*=== END CLIPS DATA ===', '', analysis_report, flags=re.DOTALL).strip()
-                
-                # Build inline buttons for each clip recommendation in this session
-                keyboard = []
-                for clip in clips_data:
-                    clip_id = clip.get("id", 1)
-                    start_sec = clip.get("start", 0)
-                    end_sec = clip.get("end", 0)
-                    title = clip.get("title", f"Klip {clip_id}")
-                    
-                    # Format callback: cut:<youtube_id>:<start_sec>:<end_sec>
-                    callback_data = f"cut:{video_id}:{start_sec}:{end_sec}"
-                    button_text = f"🎬 {title}"
-                    keyboard.append([InlineKeyboardButton(button_text, callback_data=callback_data)])
-                    
-                reply_markup = InlineKeyboardMarkup(keyboard) if keyboard else None
-                await update.message.reply_text(clean_report, parse_mode="Markdown", reply_markup=reply_markup)
-                
-            await status_message.delete()
-            
-        except Exception as e:
-            logger.error(f"Error handling YouTube link: {e}", exc_info=True)
-            await status_message.edit_text(f"❌ Terjadi kesalahan saat memproses link YouTube: {str(e)}")
-        return
-
+    # 3. Fallback when not in any waiting state
     await update.message.reply_text(
-        "💡 Kirim link video YouTube atau upload file video secara langsung untuk memulai analisis.",
+        "⚠️ Silakan masuk ke menu utama `/start` terlebih dahulu untuk memilih fitur yang ingin digunakan!",
         parse_mode="Markdown"
     )
 
