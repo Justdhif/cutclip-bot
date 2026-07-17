@@ -45,107 +45,52 @@ async def post_init(application: Application) -> None:
     await application.bot.set_my_commands(commands)
     logger.info("Saran perintah bot (Bot Commands) berhasil didaftarkan ke Telegram.")
 
+# Global constant for the main welcome screen
+WELCOME_TEXT = (
+    "👋 **Halo! Saya CutClip Bot** 🎬🤖\n\n"
+    "Saya adalah asisten pintar berbasis AI yang siap mendampingi Anda memproduksi video pendek berkualitas tinggi!\n\n"
+    "Tugas utama saya adalah **mendeteksi momen-momen emas (paling menarik/lucu/klimaks)** dari video biasa maupun live streaming YouTube panjang, lalu memotongnya (*clipping*) menjadi cuplikan video pendek berdurasi kustom yang siap Anda unduh.\n\n"
+    "Silakan jelajahi tombol di bawah untuk melihat detail bantuan atau cara langsung memotong video! 👇"
+)
+
+def get_main_keyboard():
+    return InlineKeyboardMarkup([
+        [
+            InlineKeyboardButton("📖 Help", callback_data="menu:help"),
+            InlineKeyboardButton("🎬 Clip", callback_data="menu:clip")
+        ]
+    ])
+
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     context.user_data.clear()
-    welcome_text = (
-        "👋 **Halo! Saya CutClip Bot** 🎬🤖\n\n"
-        "Saya adalah asisten pintar berbasis AI yang siap mendampingi Anda memproduksi video pendek berkualitas tinggi!\n\n"
-        "Tugas utama saya adalah **mendeteksi momen-momen emas (paling menarik/lucu/klimaks)** dari video biasa maupun live streaming YouTube panjang, lalu memotongnya (*clipping*) menjadi cuplikan video pendek berdurasi kustom yang siap Anda unduh.\n\n"
-        "Silakan jelajahi tombol di bawah untuk melihat detail bantuan atau cara langsung memotong video! 👇"
-    )
-    keyboard = [
-        [
-            InlineKeyboardButton("📖 Help", callback_data="help:general"),
-            InlineKeyboardButton("🎬 Clip", callback_data="help:clip")
-        ]
-    ]
-    reply_markup = InlineKeyboardMarkup(keyboard)
-    await update.message.reply_text(welcome_text, parse_mode="Markdown", reply_markup=reply_markup)
+    await update.message.reply_text(WELCOME_TEXT, parse_mode="Markdown", reply_markup=get_main_keyboard())
 
 async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     await start(update, context)
 
 # tren_mode and exit_mode functions removed
 
-async def handle_video(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    video = update.message.video or update.message.document
-    if not video:
-        return
-
-    file_size_mb = video.file_size / (1024 * 1024)
-    if file_size_mb > 20:
-        await update.message.reply_text(
-            "⚠️ Ukuran file video terlalu besar. Telegram membatasi download langsung oleh bot maksimal 20MB. "
-            "Silakan gunakan video dengan durasi/ukuran lebih kecil atau upload ke YouTube lalu kirim link-nya."
-        )
-        return
-
-    status_message = await update.message.reply_text("📥 Mengunduh video Anda...")
-    
-    try:
-        file = await context.bot.get_file(video.file_id)
-        temp_dir = tempfile.gettempdir()
-        file_ext = ".mp4"
-        if hasattr(video, 'file_name') and video.file_name:
-            _, file_ext = os.path.splitext(video.file_name)
-            
-        local_path = os.path.join(temp_dir, f"{video.file_unique_id}{file_ext}")
-        await file.download_to_drive(local_path)
-        
-        await status_message.edit_text("🎵 Mengekstrak & Mentranskripsi Audio (Groq Whisper)...")
-        processed_path = analyzer.convert_video_to_audio_if_large(local_path)
-        
-        # Transcribe with timestamps
-        verbose_data = analyzer.transcribe_audio_verbose(processed_path)
-        sessions = analyzer.split_transcript_into_sessions(verbose_data)
-        
-        # Cleanup
-        safe_delete(local_path)
-        if processed_path != local_path:
-            safe_delete(processed_path)
-
-        if not sessions:
-            await status_message.edit_text("❌ Gagal mendeteksi percakapan/suara dalam video tersebut. Pastikan suara terdengar jelas.")
-            return
-
-        await status_message.edit_text(f"🧠 Menganalisis potensi viralitas ({len(sessions)} sesi)...")
-        
-        title = getattr(video, 'file_name', 'Video Telegram') or 'Video Telegram'
-        for idx, session in enumerate(sessions):
-            label = session["session_label"]
-            text_transcript = session["transcript_text"]
-            
-            analysis_report = ""
-            for attempt in range(4):
-                analysis_report = analyzer.analyze_viral_potential(text_transcript, title, label)
-                if "429" in analysis_report or "Too Many Requests" in analysis_report:
-                    if attempt < 3:
-                        wait_sec = 25
-                        await status_message.edit_text(
-                            f"⏳ Terkena limit API Groq untuk {label}.\n"
-                            f"Menunggu {wait_sec} detik sebelum mencoba kembali (Percobaan {attempt + 1}/3)..."
-                        )
-                        await asyncio.sleep(wait_sec)
-                        await status_message.edit_text(f"🧠 Menganalisis potensi viralitas ({label})...")
-                        continue
-                break
-                
-            clean_report = re.sub(r'=== CLIPS DATA ===.*=== END CLIPS DATA ===', '', analysis_report, flags=re.DOTALL).strip()
-            await update.message.reply_text(clean_report, parse_mode="Markdown")
-            
-        await status_message.delete()
-
-    except Exception as e:
-        logger.error(f"Error handling video: {e}", exc_info=True)
-        await status_message.edit_text(f"❌ Terjadi kesalahan saat memproses video: {str(e)}")
+# handle_video function removed
 
 async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     text = update.message.text
     if not text:
         return
 
+    state = context.user_data.get("state")
+    if state != "WAITING_YOUTUBE_LINK":
+        await update.message.reply_text(
+            "⚠️ Silakan masuk ke menu **Clip** lalu klik **Kirim Link YT** terlebih dahulu sebelum mengirim link atau teks!\n\n"
+            "Ketik /start untuk membuka menu utama.",
+            parse_mode="Markdown"
+        )
+        return
+
     youtube_match = YOUTUBE_REGEX.search(text)
     if youtube_match:
+        # Clear state after receiving valid link to exit the mode
+        context.user_data.clear()
+        
         url = youtube_match.group(0)
         video_id = youtube_match.group(6) # The 11 character video ID
         
@@ -278,27 +223,47 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
         logger.warning(f"Gagal menjawab callback query (kemungkinan query kadaluarsa/lama): {e}")
     
     data = query.data
-    if data == "help:general":
-        general_text = (
-            "🤖 **Tentang CutClip Bot**\n\n"
-            "Bot ini dirancang khusus untuk membantu Anda mendeteksi momen-momen menarik dari video biasa maupun live streaming YouTube menggunakan AI secara otomatis, serta memotong klip (clipping) dengan durasi waktu kustom yang Anda tentukan sendiri! 🚀"
-        )
-        await query.message.reply_text(general_text, parse_mode="Markdown")
+    
+    if data == "menu:main":
+        context.user_data.clear()
+        await query.message.edit_text(WELCOME_TEXT, parse_mode="Markdown", reply_markup=get_main_keyboard())
         return
         
-    if data == "help:clip":
+    if data == "menu:help":
+        general_text = (
+            "🤖 **Tentang CutClip Bot**\n\n"
+            "Bot ini dirancang khusus untuk membantu Anda mendeteksi momen-momen menarik dari live streaming maupun video YouTube menggunakan AI secara otomatis, serta memotong klip (*clipping*) dengan durasi waktu kustom yang Anda tentukan sendiri! 🚀"
+        )
+        keyboard = [[InlineKeyboardButton("« Kembali", callback_data="menu:main")]]
+        await query.message.edit_text(general_text, parse_mode="Markdown", reply_markup=InlineKeyboardMarkup(keyboard))
+        return
+        
+    if data == "menu:clip":
         clip_text = (
             "🎬 **Panduan Memotong (Clip) Video & Deteksi Momen:**\n\n"
             "1. **Mendeteksi Momen Menarik (AI)**:\n"
-            "   Cukup kirimkan link video YouTube atau link Live Stream ke chat ini. AI akan mentranskripsi suara dan memberikan rekomendasi momen terbaik beserta tombol potong otomatis.\n\n"
+            "   Cukup kirimkan link video YouTube atau link Live Stream. AI akan mentranskripsi suara dan memberikan rekomendasi momen terbaik beserta tombol potong otomatis.\n\n"
             "2. **Memotong Klip Kustom secara Manual**:\n"
             "   Kirim link YouTube Anda diikuti dengan durasi menit/detik yang ingin dipotong. Contoh:\n"
             "   • *'tolong clip dari menit 1 sampai menit 2 dari link https://youtube...'* \n"
-            "   • *'clip detik 30 sampai 1:15 https://youtube...'* \n\n"
-            "3. **Upload File Video Langsung**:\n"
-            "   Kirim file video secara langsung (maksimal 20MB) ke chat ini untuk dianalisis otomatis."
+            "   • *'clip detik 30 sampai 1:15 https://youtube...'* "
         )
-        await query.message.reply_text(clip_text, parse_mode="Markdown")
+        keyboard = [
+            [InlineKeyboardButton("🔗 Kirim Link YT", callback_data="menu:send_link")],
+            [InlineKeyboardButton("« Kembali", callback_data="menu:main")]
+        ]
+        await query.message.edit_text(clip_text, parse_mode="Markdown", reply_markup=InlineKeyboardMarkup(keyboard))
+        return
+        
+    if data == "menu:send_link":
+        context.user_data["state"] = "WAITING_YOUTUBE_LINK"
+        send_link_text = (
+            "📥 **Mode Kirim Link YT Aktif**\n\n"
+            "Silakan paste/kirimkan link video YouTube, Shorts, atau Live Stream ke chat ini sekarang.\n\n"
+            "*(Klik Batal di bawah untuk keluar dari mode ini)*"
+        )
+        keyboard = [[InlineKeyboardButton("❌ Batal", callback_data="menu:main")]]
+        await query.message.edit_text(send_link_text, parse_mode="Markdown", reply_markup=InlineKeyboardMarkup(keyboard))
         return
         
     if data.startswith("cut:"):
@@ -355,7 +320,6 @@ def run_bot() -> None:
     # Callback Query handler for video clipping buttons
     application.add_handler(CallbackQueryHandler(handle_callback))
 
-    application.add_handler(MessageHandler(filters.VIDEO | filters.Document.VIDEO, handle_video))
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_text))
 
     logger.info("Bot started successfully in modular format. Polling for messages...")
