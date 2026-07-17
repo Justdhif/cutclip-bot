@@ -46,30 +46,6 @@ async def post_init(application: Application) -> None:
     await application.bot.set_my_commands(commands)
     logger.info("Saran perintah bot (Bot Commands) berhasil didaftarkan ke Telegram.")
 
-async def reply_with_logo(update: Update, text: str, reply_markup=None) -> None:
-    logo_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "logo.jpg")
-    if os.path.exists(logo_path):
-        try:
-            if len(text) <= 1024:
-                await update.message.reply_photo(
-                    photo=open(logo_path, "rb"),
-                    caption=text,
-                    parse_mode="Markdown",
-                    reply_markup=reply_markup
-                )
-            else:
-                await update.message.reply_photo(photo=open(logo_path, "rb"))
-                await update.message.reply_text(
-                    text,
-                    parse_mode="Markdown",
-                    reply_markup=reply_markup
-                )
-            return
-        except Exception as e:
-            logger.warning(f"Gagal mengirim logo: {e}")
-            
-    await update.message.reply_text(text, parse_mode="Markdown", reply_markup=reply_markup)
-
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     context.user_data.clear()
     welcome_text = (
@@ -88,7 +64,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         [InlineKeyboardButton("🎥 Panduan Analisis Video", callback_data="help:analisis")]
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
-    await reply_with_logo(update, welcome_text, reply_markup=reply_markup)
+    await update.message.reply_text(welcome_text, parse_mode="Markdown", reply_markup=reply_markup)
 
 async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     await start(update, context)
@@ -169,7 +145,7 @@ async def handle_video(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
                 break
                 
             clean_report = re.sub(r'=== CLIPS DATA ===.*=== END CLIPS DATA ===', '', analysis_report, flags=re.DOTALL).strip()
-            await reply_with_logo(update, clean_report)
+            await update.message.reply_text(clean_report, parse_mode="Markdown")
             
         await status_message.delete()
 
@@ -293,7 +269,7 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
                     keyboard.append([InlineKeyboardButton(button_text, callback_data=callback_data)])
                     
                 reply_markup = InlineKeyboardMarkup(keyboard) if keyboard else None
-                await reply_with_logo(update, clean_report, reply_markup=reply_markup)
+                await update.message.reply_text(clean_report, parse_mode="Markdown", reply_markup=reply_markup)
                 
             await status_message.delete()
             
