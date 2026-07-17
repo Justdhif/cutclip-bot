@@ -39,45 +39,26 @@ YOUTUBE_REGEX = re.compile(
 async def post_init(application: Application) -> None:
     """Registers bot commands to show as suggestions in the Telegram chat."""
     commands = [
-        BotCommand("start", "Memulai bot & tampilkan menu utama"),
-        BotCommand("analisis", "Panduan cara menganalisis video"),
-        BotCommand("help", "Penjelasan fitur & cara pakai"),
+        BotCommand("start", "Memulai CutClip Bot"),
+        BotCommand("help", "Bantuan & Panduan"),
     ]
     await application.bot.set_my_commands(commands)
     logger.info("Saran perintah bot (Bot Commands) berhasil didaftarkan ke Telegram.")
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     context.user_data.clear()
-    welcome_text = (
-        "👋 **Selamat datang di CutClip Bot!**\n\n"
-        "Saya adalah asisten AI yang siap membantu Anda memproduksi video dengan potensi viral tinggi. Berikut adalah fitur utama:\n\n"
-        "🎥 **1. Analisis Potensi Viral & Clipping Otomatis**\n"
-        "Kirim link video YouTube (Short / Livestream) atau unggah video langsung. "
-        "AI akan membagi transkrip per sesi (20 menit sekali) dan mendeteksi momen terbaik untuk diunduh langsung!\n\n"
-        "✂️ **2. Potong Klip Kustom (Manual Clipping)**\n"
-        "Kirim link YouTube dan ketik instruksi pemotongan Anda, contoh:\n"
-        "• *'tolong clip dari menit 1 sampai menit 2 dari link https://youtube...'* \n"
-        "• *'clip detik 30 sampai 1:15 https://youtube...'*\n"
-        "Bot akan langsung memotong video sesuai durasi kustom Anda dan mengirimkannya dengan audio!"
-    )
+    welcome_text = "Hai saya CutClip Bot, ada yang bisa dibantu?"
     keyboard = [
-        [InlineKeyboardButton("🎥 Panduan Analisis Video", callback_data="help:analisis")]
+        [
+            InlineKeyboardButton("📖 Help", callback_data="help:general"),
+            InlineKeyboardButton("🎬 Clip", callback_data="help:clip")
+        ]
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
-    await update.message.reply_text(welcome_text, parse_mode="Markdown", reply_markup=reply_markup)
+    await update.message.reply_text(welcome_text, reply_markup=reply_markup)
 
 async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     await start(update, context)
-
-async def analisis_info(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    info_text = (
-        "🎥 **Cara Menganalisis Video:**\n\n"
-        "1. **Upload Video Langsung**:\n"
-        "   Kirim file video (.mp4, .mov, dll.) langsung ke chat ini. Pastikan ukuran file di bawah 20MB.\n\n"
-        "2. **Kirim Link YouTube**:\n"
-        "   Cukup paste/kirim link YouTube, YouTube Shorts, atau link Youtube stream ke chat ini. AI akan mengambil audio dari link tersebut untuk dianalisis secara berkala (per 20 menit)."
-    )
-    await update.message.reply_text(info_text, parse_mode="Markdown")
 
 # tren_mode and exit_mode functions removed
 
@@ -292,15 +273,27 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
         logger.warning(f"Gagal menjawab callback query (kemungkinan query kadaluarsa/lama): {e}")
     
     data = query.data
-    if data == "help:analisis":
-        info_text = (
-            "🎥 **Cara Menganalisis Video:**\n\n"
-            "1. **Upload Video Langsung**:\n"
-            "   Kirim file video (.mp4, .mov, dll.) langsung ke chat ini. Pastikan ukuran file di bawah 20MB.\n\n"
-            "2. **Kirim Link YouTube**:\n"
-            "   Cukup paste/kirim link YouTube, YouTube Shorts, atau link Youtube stream ke chat ini. AI akan mengambil audio dari link tersebut untuk dianalisis secara berkala (per 20 menit)."
+    if data == "help:general":
+        general_text = (
+            "🤖 **Tentang CutClip Bot**\n\n"
+            "Bot ini dirancang khusus untuk membantu Anda mendeteksi momen-momen menarik dari video biasa maupun live streaming YouTube menggunakan AI secara otomatis, serta memotong klip (clipping) dengan durasi waktu kustom yang Anda tentukan sendiri! 🚀"
         )
-        await query.message.reply_text(info_text, parse_mode="Markdown")
+        await query.message.reply_text(general_text, parse_mode="Markdown")
+        return
+        
+    if data == "help:clip":
+        clip_text = (
+            "🎬 **Panduan Memotong (Clip) Video & Deteksi Momen:**\n\n"
+            "1. **Mendeteksi Momen Menarik (AI)**:\n"
+            "   Cukup kirimkan link video YouTube atau link Live Stream ke chat ini. AI akan mentranskripsi suara dan memberikan rekomendasi momen terbaik beserta tombol potong otomatis.\n\n"
+            "2. **Memotong Klip Kustom secara Manual**:\n"
+            "   Kirim link YouTube Anda diikuti dengan durasi menit/detik yang ingin dipotong. Contoh:\n"
+            "   • *'tolong clip dari menit 1 sampai menit 2 dari link https://youtube...'* \n"
+            "   • *'clip detik 30 sampai 1:15 https://youtube...'* \n\n"
+            "3. **Upload File Video Langsung**:\n"
+            "   Kirim file video secara langsung (maksimal 20MB) ke chat ini untuk dianalisis otomatis."
+        )
+        await query.message.reply_text(clip_text, parse_mode="Markdown")
         return
         
     if data.startswith("cut:"):
@@ -353,7 +346,6 @@ def run_bot() -> None:
 
     application.add_handler(CommandHandler("start", start))
     application.add_handler(CommandHandler("help", help_command))
-    application.add_handler(CommandHandler("analisis", analisis_info))
 
     # Callback Query handler for video clipping buttons
     application.add_handler(CallbackQueryHandler(handle_callback))
