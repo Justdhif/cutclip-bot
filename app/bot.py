@@ -310,7 +310,10 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
 async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Handles inline keyboard button clicks for video clipping."""
     query = update.callback_query
-    await query.answer() # Ack the query
+    try:
+        await query.answer() # Ack the query
+    except Exception as e:
+        logger.warning(f"Gagal menjawab callback query (kemungkinan query kadaluarsa/lama): {e}")
     
     data = query.data
     if data == "help:analisis":
