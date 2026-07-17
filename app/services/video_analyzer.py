@@ -247,6 +247,9 @@ class VideoAnalyzer:
             'outtmpl': output_filename,
             'download_ranges': lambda info_dict, ydl: [{'start_time': start_time, 'end_time': end_time}],
             'force_keyframes_at_cuts': True,
+            'external_downloader_args': {
+                'ffmpeg_i': ['-headers', 'User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36\r\n']
+            },
             'js_runtimes': {'node': {}},
             'quiet': True,
             'no_warnings': True,
