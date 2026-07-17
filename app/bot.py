@@ -121,6 +121,11 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
                     )
                     try:
                         clip_path = analyzer.trim_youtube_video(video_id, start_sec, end_sec)
+                        
+                        await status_message.edit_text("🧠 Menganalisis isi konten dalam klip kustom Anda...")
+                        clip_transcript = analyzer.transcribe_trimmed_clip(clip_path)
+                        clip_analysis = analyzer.analyze_custom_clip_potential(clip_transcript, start_sec, end_sec)
+                        
                         await status_message.edit_text("📤 Mengunggah klip video kustom Anda...")
                         
                         with open(clip_path, "rb") as video_file:
@@ -129,6 +134,9 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
                                 caption=f"🎥 **Potongan Klip Kustom (Detik {start_sec} - {end_sec})**\nSelesai dipotong sesuai permintaan Anda dengan audio!",
                                 parse_mode="Markdown"
                             )
+                        
+                        await update.message.reply_text(clip_analysis, parse_mode="Markdown")
+                        
                         safe_delete(clip_path)
                         await status_message.delete()
                         return # Exit early, do not do the full analysis
