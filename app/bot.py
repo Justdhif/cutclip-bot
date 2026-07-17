@@ -144,15 +144,25 @@ async def handle_video(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
         
         title = getattr(video, 'file_name', 'Video Telegram') or 'Video Telegram'
         for idx, session in enumerate(sessions):
-            if idx > 0:
-                # Sleep to avoid Groq Rate Limit (429)
-                await asyncio.sleep(5)
             label = session["session_label"]
             text_transcript = session["transcript_text"]
             
-            analysis_report = analyzer.analyze_viral_potential(text_transcript, title, label)
+            analysis_report = ""
+            for attempt in range(4):
+                analysis_report = analyzer.analyze_viral_potential(text_transcript, title, label)
+                if "429" in analysis_report or "Too Many Requests" in analysis_report:
+                    if attempt < 3:
+                        wait_sec = 25
+                        await status_message.edit_text(
+                            f"⏳ Terkena limit API Groq untuk {label}.\n"
+                            f"Menunggu {wait_sec} detik sebelum mencoba kembali (Percobaan {attempt + 1}/3)..."
+                        )
+                        await asyncio.sleep(wait_sec)
+                        await status_message.edit_text(f"🧠 Menganalisis potensi viralitas ({label})...")
+                        continue
+                break
+                
             clean_report = re.sub(r'=== CLIPS DATA ===.*=== END CLIPS DATA ===', '', analysis_report, flags=re.DOTALL).strip()
-            
             await update.message.reply_text(clean_report, parse_mode="Markdown")
             
         await status_message.delete()
@@ -234,13 +244,23 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
             
             # Send separate bubble chats for each 20-minute session
             for idx, session in enumerate(sessions):
-                if idx > 0:
-                    # Sleep to avoid Groq Rate Limit (429)
-                    await asyncio.sleep(5)
                 label = session["session_label"]
                 text_transcript = session["transcript_text"]
                 
-                analysis_report = analyzer.analyze_viral_potential(text_transcript, f"YouTube Video ({url})", label)
+                analysis_report = ""
+                for attempt in range(4):
+                    analysis_report = analyzer.analyze_viral_potential(text_transcript, f"YouTube Video ({url})", label)
+                    if "429" in analysis_report or "Too Many Requests" in analysis_report:
+                        if attempt < 3:
+                            wait_sec = 25
+                            await status_message.edit_text(
+                                f"⏳ Terkena limit API Groq untuk {label}.\n"
+                                f"Menunggu {wait_sec} detik sebelum mencoba kembali (Percobaan {attempt + 1}/3)..."
+                            )
+                            await asyncio.sleep(wait_sec)
+                            await status_message.edit_text(f"🧠 Menganalisis potensi viralitas & merekomendasikan klip ({label})...")
+                            continue
+                    break
                 
                 # Extract JSON data for buttons
                 clips_data = []
