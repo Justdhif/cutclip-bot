@@ -3,6 +3,7 @@ import re
 import logging
 import tempfile
 import json
+import asyncio
 from telegram import Update, BotCommand, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import (
     Application,
@@ -142,7 +143,10 @@ async def handle_video(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
         await status_message.edit_text(f"🧠 Menganalisis potensi viralitas ({len(sessions)} sesi)...")
         
         title = getattr(video, 'file_name', 'Video Telegram') or 'Video Telegram'
-        for session in sessions:
+        for idx, session in enumerate(sessions):
+            if idx > 0:
+                # Sleep to avoid Groq Rate Limit (429)
+                await asyncio.sleep(5)
             label = session["session_label"]
             text_transcript = session["transcript_text"]
             
@@ -229,7 +233,10 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
             await status_message.edit_text(f"🧠 Menganalisis potensi viralitas & merekomendasikan klip ({len(sessions)} sesi)...")
             
             # Send separate bubble chats for each 20-minute session
-            for session in sessions:
+            for idx, session in enumerate(sessions):
+                if idx > 0:
+                    # Sleep to avoid Groq Rate Limit (429)
+                    await asyncio.sleep(5)
                 label = session["session_label"]
                 text_transcript = session["transcript_text"]
                 
