@@ -58,7 +58,7 @@ async def post_init(application: Application) -> None:
     """Registers bot commands to show as suggestions in the Telegram chat."""
     commands = [
         BotCommand("start", "Memulai CutClip Bot"),
-        BotCommand("exit", "Keluar dari mode kirim link"),
+        BotCommand("exit", "Keluar dari mode aktif"),
         BotCommand("help", "Bantuan & Panduan"),
     ]
     await application.bot.set_my_commands(commands)
