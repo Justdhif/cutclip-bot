@@ -98,6 +98,20 @@ async def exit_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
 
 async def handle_video_for_caption(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     state = context.user_data.get("state")
+    chat_type = update.effective_chat.type
+    is_group = chat_type in ["group", "supergroup"]
+    
+    bot_username = context.bot.username or ""
+    caption = update.message.caption or ""
+    is_mentioned = f"@{bot_username}" in caption if bot_username else False
+    is_reply_to_bot = False
+    if update.message.reply_to_message and update.message.reply_to_message.from_user:
+        is_reply_to_bot = update.message.reply_to_message.from_user.id == context.bot.id
+
+    # If in group and not mentioned/replied and state is not active, ignore video silently
+    if is_group and not is_mentioned and not is_reply_to_bot and state != "WAITING_VIDEO_FOR_CAPTION":
+        return
+
     if state != "WAITING_VIDEO_FOR_CAPTION":
         await update.message.reply_text(
             "⚠️ Silakan masuk ke menu **Caption** lalu klik **Generate** terlebih dahulu sebelum mengirimkan file video!\n\n"
@@ -160,6 +174,18 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
         return
 
     state = context.user_data.get("state")
+    chat_type = update.effective_chat.type
+    is_group = chat_type in ["group", "supergroup"]
+    
+    bot_username = context.bot.username or ""
+    is_mentioned = f"@{bot_username}" in text if bot_username else False
+    is_reply_to_bot = False
+    if update.message.reply_to_message and update.message.reply_to_message.from_user:
+        is_reply_to_bot = update.message.reply_to_message.from_user.id == context.bot.id
+
+    # If in group and not mentioned/replied and state is not active, ignore message silently
+    if is_group and not is_mentioned and not is_reply_to_bot and not state:
+        return
     
     # 1. Handling for Caption Generator mode (Link input fallback)
     if state == "WAITING_VIDEO_FOR_CAPTION":
