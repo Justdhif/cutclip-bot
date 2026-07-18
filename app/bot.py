@@ -184,7 +184,16 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
                 await status_message.delete()
             except Exception as e:
                 logger.error(f"Error generating caption from link: {e}", exc_info=True)
-                await status_message.edit_text(f"❌ Gagal memproses link tersebut: {str(e)}")
+                err_msg = str(e)
+                if "blocked" in err_msg.lower() or "ip address" in err_msg.lower() or "forbidden" in err_msg.lower():
+                    await status_message.edit_text(
+                        "❌ **IP Address Bot diblokir oleh TikTok/Instagram.**\n\n"
+                        "Sistem keamanan TikTok/Instagram memblokir unduhan bot. "
+                        "Silakan coba unggah file video hasil editan Anda secara langsung (maksimal 20MB).",
+                        parse_mode="Markdown"
+                    )
+                else:
+                    await status_message.edit_text(f"❌ Gagal memproses link tersebut: {err_msg}")
             return
         else:
             await update.message.reply_text(
@@ -319,7 +328,16 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
                 
             except Exception as e:
                 logger.error(f"Error handling link: {e}", exc_info=True)
-                await status_message.edit_text(f"❌ Terjadi kesalahan saat memproses link: {str(e)}")
+                err_msg = str(e)
+                if "blocked" in err_msg.lower() or "ip address" in err_msg.lower() or "forbidden" in err_msg.lower():
+                    await status_message.edit_text(
+                        "❌ **IP Address Bot diblokir oleh TikTok/Instagram.**\n\n"
+                        "Sistem keamanan TikTok/Instagram memblokir unduhan bot. "
+                        "Silakan gunakan link YouTube, atau unggah video langsung di bawah 20MB.",
+                        parse_mode="Markdown"
+                    )
+                else:
+                    await status_message.edit_text(f"❌ Terjadi kesalahan saat memproses link: {err_msg}")
             return
         else:
             await update.message.reply_text(
@@ -344,106 +362,112 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
     
     data = query.data
     
-    if data == "menu:main":
-        context.user_data.clear()
-        await query.message.edit_text(WELCOME_TEXT, parse_mode="Markdown", reply_markup=get_main_keyboard())
-        return
-        
-    if data == "menu:help":
-        general_text = (
-            "🤖 **Tentang CutClip Bot**\n\n"
-            "Bot ini dirancang khusus untuk membantu Anda mendeteksi momen-momen menarik dari live streaming maupun video YouTube menggunakan AI secara otomatis, serta memotong klip (*clipping*) dengan durasi waktu kustom yang Anda tentukan sendiri! 🚀"
-        )
-        keyboard = [[InlineKeyboardButton("« Kembali", callback_data="menu:main")]]
-        await query.message.edit_text(general_text, parse_mode="Markdown", reply_markup=InlineKeyboardMarkup(keyboard))
-        return
-        
-    if data == "menu:clip":
-        clip_text = (
-            "🎬 **Panduan Memotong (Clip) Video & Deteksi Momen**\n\n"
-            "1️⃣ **Deteksi Momen Otomatis (AI)**\n"
-            "Kirimkan link video YouTube atau Live Stream. AI akan menganalisis percakapan/suara dan menyajikan rekomendasi klip terbaik secara otomatis.\n\n"
-            "2️⃣ **Potong Klip Kustom (Manual)**\n"
-            "Kirim link YouTube disertai durasi yang ingin Anda potong. Contoh format:\n"
-            "• `clip menit 1 sampai 2 https://youtube...`\n"
-            "• `clip detik 30 sampai 1:15 https://youtube...`"
-        )
-        keyboard = [
-            [InlineKeyboardButton("🔗 Kirim Link YT", callback_data="menu:send_link")],
-            [InlineKeyboardButton("« Kembali", callback_data="menu:main")]
-        ]
-        await query.message.edit_text(clip_text, parse_mode="Markdown", reply_markup=InlineKeyboardMarkup(keyboard))
-        return
-        
-    if data == "menu:send_link":
-        context.user_data["state"] = "WAITING_YOUTUBE_LINK"
-        send_link_text = (
-            "📥 **Mode Kirim Link YT Aktif**\n\n"
-            "Silakan paste/kirimkan link video YouTube, Shorts, atau Live Stream ke chat ini sekarang.\n\n"
-            "*(Ketik /exit atau klik tombol Keluar di bawah untuk menonaktifkan mode ini)*"
-        )
-        keyboard = [[InlineKeyboardButton("❌ Keluar", callback_data="menu:main")]]
-        await query.message.edit_text(send_link_text, parse_mode="Markdown", reply_markup=InlineKeyboardMarkup(keyboard))
-        return
-        
-    if data == "menu:caption":
-        caption_text = (
-            "✍️ **Panduan Caption Generator**\n\n"
-            "Fitur ini membantu Anda membuat caption media sosial yang pas, menarik, gaul (ala humor Gen Z), serta menyertakan rekomendasi hashtag viral untuk menaikkan views video hasil editan Anda.\n\n"
-            "👉 **Cara Penggunaan**:\n"
-            "Cukup klik tombol **✨ Generate** di bawah, lalu unggah/kirim file video hasil editan Anda (format MP4/MOV, maksimal 20MB) ke bot ini. AI akan mendengarkan suara/percakapan di dalamnya untuk membuat caption yang sesuai!"
-        )
-        keyboard = [
-            [InlineKeyboardButton("✨ Generate", callback_data="menu:send_video")],
-            [InlineKeyboardButton("« Kembali", callback_data="menu:main")]
-        ]
-        await query.message.edit_text(caption_text, parse_mode="Markdown", reply_markup=InlineKeyboardMarkup(keyboard))
-        return
-        
-    if data == "menu:send_video":
-        context.user_data["state"] = "WAITING_VIDEO_FOR_CAPTION"
-        send_video_text = (
-            "📥 **Mode Caption Generator Aktif**\n\n"
-            "Silakan kirimkan/unggah file video hasil editan Anda (maksimal 20MB) ke chat ini sekarang.\n\n"
-            "*(Ketik /exit atau klik tombol Keluar di bawah untuk menonaktifkan mode ini)*"
-        )
-        keyboard = [[InlineKeyboardButton("❌ Keluar", callback_data="menu:main")]]
-        await query.message.edit_text(send_video_text, parse_mode="Markdown", reply_markup=InlineKeyboardMarkup(keyboard))
-        return
-        
-    if data.startswith("cut:"):
-        parts = data.split(":")
-        if len(parts) == 4:
-            _, video_id, start_str, end_str = parts
-            start_sec = int(start_str)
-            end_sec = int(end_str)
-            duration = end_sec - start_sec
+    try:
+        if data == "menu:main":
+            context.user_data.clear()
+            await query.message.edit_text(WELCOME_TEXT, parse_mode="Markdown", reply_markup=get_main_keyboard())
+            return
             
-            status_msg = await query.message.reply_text(
-                f"✂️ Sedang mengambil & memotong momen video (Detik {start_sec} - {end_sec}, Durasi: {duration}s). Mohon tunggu..."
+        if data == "menu:help":
+            general_text = (
+                "🤖 **Tentang CutClip Bot**\n\n"
+                "Bot ini dirancang khusus untuk membantu Anda mendeteksi momen-momen menarik dari live streaming maupun video YouTube menggunakan AI secara otomatis, serta memotong klip (*clipping*) dengan durasi waktu kustom yang Anda tentukan sendiri! 🚀"
             )
+            keyboard = [[InlineKeyboardButton("« Kembali", callback_data="menu:main")]]
+            await query.message.edit_text(general_text, parse_mode="Markdown", reply_markup=InlineKeyboardMarkup(keyboard))
+            return
             
-            try:
-                # Trim video clip
-                clip_path = analyzer.trim_youtube_video(video_id, start_sec, end_sec)
+        if data == "menu:clip":
+            clip_text = (
+                "🎬 **Panduan Memotong (Clip) Video & Deteksi Momen**\n\n"
+                "1️⃣ **Deteksi Momen Otomatis (AI)**\n"
+                "Kirimkan link video YouTube atau Live Stream. AI akan menganalisis percakapan/suara dan menyajikan rekomendasi klip terbaik secara otomatis.\n\n"
+                "2️⃣ **Potong Klip Kustom (Manual)**\n"
+                "Kirim link YouTube disertai durasi yang ingin Anda potong. Contoh format:\n"
+                "• `clip menit 1 sampai 2 https://youtube...`\n"
+                "• `clip detik 30 sampai 1:15 https://youtube...`"
+            )
+            keyboard = [
+                [InlineKeyboardButton("🔗 Kirim Link YT", callback_data="menu:send_link")],
+                [InlineKeyboardButton("« Kembali", callback_data="menu:main")]
+            ]
+            await query.message.edit_text(clip_text, parse_mode="Markdown", reply_markup=InlineKeyboardMarkup(keyboard))
+            return
+            
+        if data == "menu:send_link":
+            context.user_data["state"] = "WAITING_YOUTUBE_LINK"
+            send_link_text = (
+                "📥 **Mode Kirim Link YT Aktif**\n\n"
+                "Silakan paste/kirimkan link video YouTube, Shorts, atau Live Stream ke chat ini sekarang.\n\n"
+                "*(Ketik /exit atau klik tombol Keluar di bawah untuk menonaktifkan mode ini)*"
+            )
+            keyboard = [[InlineKeyboardButton("❌ Keluar", callback_data="menu:main")]]
+            await query.message.edit_text(send_link_text, parse_mode="Markdown", reply_markup=InlineKeyboardMarkup(keyboard))
+            return
+            
+        if data == "menu:caption":
+            caption_text = (
+                "✍️ **Panduan Caption Generator**\n\n"
+                "Fitur ini membantu Anda membuat caption media sosial yang pas, menarik, gaul (ala humor Gen Z), serta menyertakan rekomendasi hashtag viral untuk menaikkan views video hasil editan Anda.\n\n"
+                "👉 **Cara Penggunaan**:\n"
+                "Cukup klik tombol **✨ Generate** di bawah, lalu unggah/kirim file video hasil editan Anda (format MP4/MOV, maksimal 20MB) ke bot ini. AI akan mendengarkan suara/percakapan di dalamnya untuk membuat caption yang sesuai!"
+            )
+            keyboard = [
+                [InlineKeyboardButton("✨ Generate", callback_data="menu:send_video")],
+                [InlineKeyboardButton("« Kembali", callback_data="menu:main")]
+            ]
+            await query.message.edit_text(caption_text, parse_mode="Markdown", reply_markup=InlineKeyboardMarkup(keyboard))
+            return
+            
+        if data == "menu:send_video":
+            context.user_data["state"] = "WAITING_VIDEO_FOR_CAPTION"
+            send_video_text = (
+                "📥 **Mode Caption Generator Aktif**\n\n"
+                "Silakan kirimkan/unggah file video hasil editan Anda (maksimal 20MB) ke chat ini sekarang.\n\n"
+                "*(Ketik /exit atau klik tombol Keluar di bawah untuk menonaktifkan mode ini)*"
+            )
+            keyboard = [[InlineKeyboardButton("❌ Keluar", callback_data="menu:main")]]
+            await query.message.edit_text(send_video_text, parse_mode="Markdown", reply_markup=InlineKeyboardMarkup(keyboard))
+            return
+            
+        if data.startswith("cut:"):
+            parts = data.split(":")
+            if len(parts) == 4:
+                _, video_id, start_str, end_str = parts
+                start_sec = int(start_str)
+                end_sec = int(end_str)
+                duration = end_sec - start_sec
                 
-                await status_msg.edit_text("📤 Mengunggah klip video dengan audio ke Telegram Anda...")
+                status_msg = await query.message.reply_text(
+                    f"✂️ Sedang mengambil & memotong momen video (Detik {start_sec} - {end_sec}, Durasi: {duration}s). Mohon tunggu..."
+                )
                 
-                # Send the final mp4 clip with audio
-                with open(clip_path, "rb") as video_file:
-                    await query.message.reply_video(
-                        video=video_file,
-                        caption=f"🎥 **Potongan Momen (Detik {start_sec} - {end_sec})**\nSelesai dipotong otomatis dengan audio & siap diunduh ke galeri perangkat Anda!",
-                        parse_mode="Markdown"
-                    )
-                
-                # Cleanup file
-                safe_delete(clip_path)
-                await status_msg.delete()
-                
-            except Exception as e:
-                logger.error(f"Gagal memotong klip video: {e}", exc_info=True)
-                await status_msg.edit_text(f"❌ Terjadi kesalahan saat memotong klip video: {str(e)}")
+                try:
+                    # Trim video clip
+                    clip_path = analyzer.trim_youtube_video(video_id, start_sec, end_sec)
+                    
+                    await status_msg.edit_text("📤 Mengunggah klip video dengan audio ke Telegram Anda...")
+                    
+                    # Send the final mp4 clip with audio
+                    with open(clip_path, "rb") as video_file:
+                        await query.message.reply_video(
+                            video=video_file,
+                            caption=f"🎥 **Potongan Momen (Detik {start_sec} - {end_sec})**\nSelesai dipotong otomatis dengan audio & siap diunduh ke galeri perangkat Anda!",
+                            parse_mode="Markdown"
+                        )
+                    
+                    # Cleanup file
+                    safe_delete(clip_path)
+                    await status_msg.delete()
+                    
+                except Exception as e:
+                    logger.error(f"Gagal memotong klip video: {e}", exc_info=True)
+                    await status_msg.edit_text(f"❌ Terjadi kesalahan saat memotong klip video: {str(e)}")
+    except Exception as e:
+        if "Message is not modified" in str(e):
+            logger.info("Callback ignored: message content is identical.")
+        else:
+            logger.error(f"Error in handle_callback: {e}", exc_info=True)
 
 def run_bot() -> None:
     """Initializes and runs the Telegram bot polling loop."""
