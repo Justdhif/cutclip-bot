@@ -97,6 +97,8 @@ async def exit_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
     )
 
 async def handle_video_for_caption(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    if not update.message:
+        return
     state = context.user_data.get("state")
     chat_type = update.effective_chat.type
     is_group = chat_type in ["group", "supergroup"]
@@ -169,6 +171,8 @@ async def handle_video_for_caption(update: Update, context: ContextTypes.DEFAULT
 # handle_video function removed
 
 async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    if not update.message:
+        return
     text = update.message.text
     if not text:
         return
