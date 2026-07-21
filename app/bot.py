@@ -71,6 +71,26 @@ WELCOME_TEXT = (
     "Silakan jelajahi tombol di bawah untuk melihat detail bantuan atau cara langsung memotong video! 👇"
 )
 
+HELP_TEXT = (
+    "📖 **PANDUAN PENGGUNAAN CUTCLIP BOT** 🎬🤖\n\n"
+    "Bot ini dirancang khusus untuk membantu Anda menganalisis video, memotong klip, dan membuat caption sosial media menggunakan AI!\n\n"
+    "━━━━━━━━━━━━━━━━━━━\n"
+    "1️⃣ **Deteksi Momen Viral (AI)**\n"
+    "• **Cara**: Kirimkan link video (YouTube/TikTok/IG).\n"
+    "• **Hasil**: AI menganalisis percakapan & menyajikan rekomendasi momen terbaik beserta tombol potong otomatis.\n\n"
+    "2️⃣ **Potong Klip Kustom (Manual)**\n"
+    "• **Cara**: Kirim link YouTube disertai durasi yang ingin dipotong.\n"
+    "• **Contoh**: `klip dari menit 24.45 sampai 26.45 https://youtube...` atau `clip menit 1:30 sampai 3:00 https://youtube...`\n"
+    "• **Hasil**: Bot memotong & mengunggah klip video HD 1080p.\n\n"
+    "3️⃣ **Caption Generator (Gen Z Style)**\n"
+    "• **Cara**: Unggah file video (maks 20MB) ATAU kirim link video dengan kata kunci *'caption'* (contoh: `buatkan caption https://...`).\n"
+    "• **Hasil**: AI membuatkan 3 pilihan caption gaul Gen Z & daftar hashtag viral.\n\n"
+    "👥 **Penggunaan di Grup Chat**:\n"
+    "Di dalam grup, Anda **wajib men-tag bot** `@bot` agar bot merespons!\n"
+    "• *Contoh*: `@bot clip menit 1 sampai 2 https://...`\n"
+    "━━━━━━━━━━━━━━━━━━━"
+)
+
 def get_main_keyboard():
     return InlineKeyboardMarkup([
         [
@@ -93,8 +113,9 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     await update.message.reply_text(WELCOME_TEXT, parse_mode="Markdown", reply_markup=get_main_keyboard())
 
 async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    context.user_data.clear()
-    await update.message.reply_text(WELCOME_TEXT, parse_mode="Markdown", reply_markup=get_help_keyboard())
+    bot_username = context.bot.username or "bot"
+    formatted_help = HELP_TEXT.replace("@bot", f"@{bot_username}")
+    await update.message.reply_text(formatted_help, parse_mode="Markdown", reply_markup=get_help_keyboard())
 
 async def exit_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     context.user_data.clear()
@@ -402,12 +423,10 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
             return
             
         if data == "menu:help":
-            general_text = (
-                "🤖 **Tentang CutClip Bot**\n\n"
-                "Bot ini dirancang khusus untuk membantu Anda mendeteksi momen-momen menarik dari live streaming maupun video YouTube menggunakan AI secara otomatis, serta memotong klip (*clipping*) dengan durasi waktu kustom yang Anda tentukan sendiri! 🚀"
-            )
+            bot_username = context.bot.username or "bot"
+            formatted_help = HELP_TEXT.replace("@bot", f"@{bot_username}")
             keyboard = [[InlineKeyboardButton("« Kembali", callback_data="menu:main")]]
-            await query.message.edit_text(general_text, parse_mode="Markdown", reply_markup=InlineKeyboardMarkup(keyboard))
+            await query.message.edit_text(formatted_help, parse_mode="Markdown", reply_markup=InlineKeyboardMarkup(keyboard))
             return
             
         if data == "menu:clip":
