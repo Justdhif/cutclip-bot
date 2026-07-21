@@ -81,12 +81,21 @@ def get_main_keyboard():
         ]
     ])
 
+def get_help_keyboard():
+    return InlineKeyboardMarkup([
+        [
+            InlineKeyboardButton("🎬 Clip", callback_data="menu:clip"),
+            InlineKeyboardButton("✍️ Caption", callback_data="menu:caption")
+        ]
+    ])
+
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     context.user_data.clear()
     await update.message.reply_text(WELCOME_TEXT, parse_mode="Markdown", reply_markup=get_main_keyboard())
 
 async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    await start(update, context)
+    context.user_data.clear()
+    await update.message.reply_text(WELCOME_TEXT, parse_mode="Markdown", reply_markup=get_help_keyboard())
 
 async def exit_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     context.user_data.clear()
