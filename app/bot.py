@@ -91,18 +91,39 @@ HELP_TEXT = (
     "━━━━━━━━━━━━━━━━━━━"
 )
 
+CLIP_GUIDE_TEXT = (
+    "🎬 **PANDUAN LENGKAP MEMOTONG (CLIP) VIDEO**\n\n"
+    "Fitur ini memungkinkan Anda mendeteksi momen emas secara otomatis atau memotong klip video YouTube secara presisi!\n\n"
+    "📌 **1. Pemotongan Kustom (Manual)**\n"
+    "Kirimkan pesan berisi link YouTube dan tentukan waktu mulai & selesai.\n"
+    "• **Format Menit.Detik**: `klip dari menit 24.45 sampai 26.45 https://youtube.com/watch?v=...`\n"
+    "• **Format Jam:Menit:Detik**: `clip 1:15:30 sampai 1:17:00 https://...`\n"
+    "• **Format Detik**: `potong detik 30 sampai 90 https://...`\n"
+    "*(Klip diproses dalam resolusi Full HD 1080p / 60fps)*\n\n"
+    "📌 **2. Deteksi Momen Otomatis (AI)**\n"
+    "Cukup paste link video YouTube/TikTok/Instagram tanpa menyebutkan waktu. AI akan mengunduh audio, mentranskripsi percakapan, dan merekomendasikan momen-momen paling berpotensi viral lengkap dengan tombol pemotong otomatis!"
+)
+
+CAPTION_GUIDE_TEXT = (
+    "✍️ **PANDUAN LENGKAP CAPTION GENERATOR**\n\n"
+    "Fitur ini menggunakan AI untuk mendengarkan isi konten video Anda dan membuatkan caption gaul kekinian ala Gen Z serta tagar pemacu views!\n\n"
+    "📌 **1. Mengunggah File Video Langsung**\n"
+    "Unggah file video hasil editan Anda (format MP4/MOV, ukuran maksimal 20MB) langsung ke chat ini. AI akan otomatis mendengarkan suaranya.\n\n"
+    "📌 **2. Menggunakan Link Video (YouTube/TikTok/IG)**\n"
+    "Kirimkan link video disertai kata kunci *'caption'* atau *'deskripsi'*. Contoh:\n"
+    "• `buatkan caption untuk link ini https://tiktok.com/...`\n"
+    "• `caption https://youtube.com/shorts/...`\n\n"
+    "📌 **Hasil yang Diberikan AI**:\n"
+    "• **Pilihan 1**: Caption gaya Gen Z (gaul, relatable, kaomoji).\n"
+    "• **Pilihan 2**: High Hook (clickbait & memikat penonton).\n"
+    "• **Pilihan 3**: Singkat & Aesthetic.\n"
+    "• **Hashtag Viral**: Daftar hashtag paling populer untuk boost views ke FYP/Explore."
+)
+
 def get_main_keyboard():
     return InlineKeyboardMarkup([
         [
             InlineKeyboardButton("📖 Help", callback_data="menu:help"),
-            InlineKeyboardButton("🎬 Clip", callback_data="menu:clip"),
-            InlineKeyboardButton("✍️ Caption", callback_data="menu:caption")
-        ]
-    ])
-
-def get_help_keyboard():
-    return InlineKeyboardMarkup([
-        [
             InlineKeyboardButton("🎬 Clip", callback_data="menu:clip"),
             InlineKeyboardButton("✍️ Caption", callback_data="menu:caption")
         ]
@@ -115,7 +136,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     bot_username = context.bot.username or "bot"
     formatted_help = HELP_TEXT.replace("@bot", f"@{bot_username}")
-    await update.message.reply_text(formatted_help, parse_mode="Markdown", reply_markup=get_help_keyboard())
+    await update.message.reply_text(formatted_help, parse_mode="Markdown")
 
 async def exit_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     context.user_data.clear()
@@ -430,29 +451,13 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
             return
             
         if data == "menu:clip":
-            clip_text = (
-                "🎬 **Panduan Memotong (Clip) Video & Deteksi Momen**\n\n"
-                "1️⃣ **Deteksi Momen Otomatis (AI)**\n"
-                "Kirimkan link video YouTube/TikTok/IG. AI akan menganalisis percakapan/suara dan menyajikan rekomendasi klip terbaik secara otomatis.\n\n"
-                "2️⃣ **Potong Klip Kustom (Manual)**\n"
-                "Kirim link YouTube disertai durasi yang ingin Anda potong. Contoh format:\n"
-                "• `clip menit 1 sampai 2 https://youtube...`\n"
-                "• `clip menit 24.45 sampai 26.45 https://youtube...`"
-            )
             keyboard = [[InlineKeyboardButton("« Kembali", callback_data="menu:main")]]
-            await query.message.edit_text(clip_text, parse_mode="Markdown", reply_markup=InlineKeyboardMarkup(keyboard))
+            await query.message.edit_text(CLIP_GUIDE_TEXT, parse_mode="Markdown", reply_markup=InlineKeyboardMarkup(keyboard))
             return
             
         if data == "menu:caption":
-            caption_text = (
-                "✍️ **Panduan Caption Generator**\n\n"
-                "Fitur ini membantu Anda membuat caption media sosial yang pas, menarik, gaul (ala humor Gen Z), serta menyertakan rekomendasi hashtag viral untuk menaikkan views video Anda.\n\n"
-                "👉 **Cara Penggunaan**:\n"
-                "Langsung unggah file video Anda (maks 20MB) atau kirim link video (YouTube/TikTok/IG) dengan mengetik kata *'caption'* (misal: *'buatkan caption https://...'*).\n"
-                "Bot akan langsung mentranskripsi suara dan menghasilkan caption gaul untuk Anda!"
-            )
             keyboard = [[InlineKeyboardButton("« Kembali", callback_data="menu:main")]]
-            await query.message.edit_text(caption_text, parse_mode="Markdown", reply_markup=InlineKeyboardMarkup(keyboard))
+            await query.message.edit_text(CAPTION_GUIDE_TEXT, parse_mode="Markdown", reply_markup=InlineKeyboardMarkup(keyboard))
             return
             
         if data.startswith("cut:"):
