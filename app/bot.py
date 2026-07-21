@@ -281,7 +281,15 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
                         await status_message.edit_text("⚠️ Waktu mulai harus lebih kecil dari selesai, dan durasi maksimal klip kustom adalah 10 menit.")
                         return
                 else:
-                    await status_message.delete()
+                    await status_message.edit_text(
+                        "⚠️ Gagal membaca instruksi rentang waktu pemotongan kustom Anda.\n\n"
+                        "Contoh penulisan yang didukung:\n"
+                        "• *'tolong clip dari menit 24.45 sampai 26.45'*\n"
+                        "• *'clip menit 1:30 sampai 3:00'*\n"
+                        "• *'potong detik 30 sampai 90'*",
+                        parse_mode="Markdown"
+                    )
+                    return
             
             # Run full analysis
             status_message = await update.message.reply_text(f"📥 Mengunduh stream audio dari {platform.capitalize()}...")
