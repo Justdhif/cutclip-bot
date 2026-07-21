@@ -51,24 +51,63 @@ class VideoAnalyzer:
 
     def convert_video_to_audio_if_large(self, video_path: str) -> str:
         """
-        Compresses video or extracts mono audio if size exceeds 25MB limit.
+        Compresses video or extracts mono audio if size exceeds 24MB limit.
+        Uses dynamic bitrate calculation to guarantee output size <= 24MB for Groq.
         """
         size_mb = os.path.getsize(video_path) / (1024 * 1024)
-        if size_mb < 24.5:
+        if size_mb < 24.0:
             return video_path
 
-        audio_output = os.path.splitext(video_path)[0] + "_extracted.mp3"
+        audio_output = os.path.splitext(video_path)[0] + "_compressed.mp3"
         try:
+            duration_sec = 3600 # Default fallback 1 hour
+            try:
+                probe_cmd = [
+                    "ffprobe", "-v", "error", 
+                    "-show_entries", "format=duration", 
+                    "-of", "default=noprint_wrappers=1:nokey=1", 
+                    video_path
+                ]
+                output = subprocess.check_output(probe_cmd).decode('utf-8').strip()
+                duration_sec = float(output)
+            except Exception as e:
+                logger.warning(f"Gagal mendapatkan durasi ffprobe: {e}")
+
+            # Calculate target bitrate (kbps) for ~18MB file to be safely under Groq 25MB limit
+            if duration_sec > 0:
+                calc_bitrate = int((18 * 8 * 1024) / duration_sec) # in kbps
+                calc_bitrate = max(12, min(64, calc_bitrate)) # clamp between 12k and 64k
+            else:
+                calc_bitrate = 32
+
             cmd = [
                 "ffmpeg", "-y", "-i", video_path, 
                 "-vn", "-acodec", "libmp3lame", 
-                "-ac", "1", "-ab", "64k", 
+                "-ac", "1", "-ab", f"{calc_bitrate}k", 
                 audio_output
             ]
             subprocess.run(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, check=True)
+            
             if os.path.exists(audio_output):
-                safe_delete(video_path)
-                return audio_output
+                output_mb = os.path.getsize(audio_output) / (1024 * 1024)
+                if output_mb < 24.0:
+                    safe_delete(video_path)
+                    return audio_output
+                else:
+                    # If still > 24MB (e.g. 5+ hour stream), force 12k bitrate & limit max duration
+                    extreme_output = os.path.splitext(video_path)[0] + "_extreme.mp3"
+                    cmd_extreme = [
+                        "ffmpeg", "-y", "-i", audio_output,
+                        "-t", "14400", # Limit to 4 hours
+                        "-acodec", "libmp3lame",
+                        "-ac", "1", "-ab", "12k",
+                        extreme_output
+                    ]
+                    subprocess.run(cmd_extreme, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, check=True)
+                    safe_delete(video_path)
+                    safe_delete(audio_output)
+                    return extreme_output
+                    
         except Exception as e:
             logger.warning(f"Gagal melakukan konversi ffmpeg: {e}. Menggunakan file asli.")
         return video_path
